@@ -1,39 +1,35 @@
-import React from 'react'
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
-import Dashboard from './pages/Dashboard'
-import Departments from './pages/Departments'
-import Semesters from './pages/Semesters'
-import Students from './pages/Students'
-import Rooms from './pages/Rooms'
-import SeatingWorkspace from './pages/SeatingWorkspace'
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import LandingPage from './pages/LandingPage';
+import AuthPage from './pages/AuthPage';
+import StudentSeatPage from './pages/StudentSeatPage';
+import AdminDashboard from './pages/AdminDashboard';
+import ProtectedRoute from './components/ProtectedRoute';
+import { useAuthStore } from './store/authStore';
 
-export default function App(){
+const App = () => {
+  const initialize = useAuthStore((state) => state.initialize);
+
+  useEffect(() => {
+    initialize();
+  }, [initialize]);
+
   return (
-    <BrowserRouter>
-      <div className="app">
-        <aside className="sidebar">
-          <h2>Exam Seating</h2>
-          <nav>
-            <Link to="/">Dashboard</Link>
-            <Link to="/departments">Departments</Link>
-            <Link to="/semesters">Semesters</Link>
-            <Link to="/students">Students</Link>
-            <Link to="/rooms">Rooms</Link>
-            <Link to="/workspace">Seating Workspace</Link>
-          </nav>
-        </aside>
-        <main className="main">
-          <Routes>
-            <Route path="/" element={<Dashboard/>} />
-            <Route path="/departments" element={<Departments/>} />
-            <Route path="/semesters" element={<Semesters/>} />
-            <Route path="/students" element={<Students/>} />
-            <Route path="/rooms" element={<Rooms/>} />
-            <Route path="/workspace" element={<SeatingWorkspace/>} />
-          </Routes>
-        </main>
-      </div>
-    </BrowserRouter>
-  )
-}
+    <Routes>
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/auth" element={<AuthPage />} />
+      <Route path="/student-seat" element={<StudentSeatPage />} />
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute roles={['admin']}>
+            <AdminDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+};
 
+export default App;
