@@ -2,19 +2,24 @@ import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { FiArrowRight, FiLayers, FiShield, FiGrid, FiCheckCircle } from 'react-icons/fi';
 import { useAuthStore } from '../store/authStore';
+import { apiClient } from '../services/api';
+import { use, useEffect, useState } from 'react';
 
-const stats = [
+
+const stat = [
   { label: 'Departments onboarded', value: '24+' },
   { label: 'Seats arranged this year', value: '18,400' },
   { label: 'Exam rooms optimized', value: '320' },
   { label: 'Avg. planning time', value: '4 min' },
 ];
 
+
+
 const features = [
   {
     icon: <FiShield className="text-brand-400" size={26} />,
     title: 'Role-aware access',
-    description: 'Dedicated flows for students, invigilators, and admins with secure JWT auth.',
+    description: 'Dedicated flows for students and invigilators or admins with secure JWT auth.',
   },
   {
     icon: <FiLayers className="text-brand-400" size={26} />,
@@ -39,11 +44,37 @@ const steps = [
 
 const LandingPage = () => {
   const { user } = useAuthStore();
+  const [statLoader, setStatLoader] = useState();
+  const [statData, setStatData] = useState([]);
+
+  const loadStats = async () => {
+    setStatLoader(true);
+    try {
+      const response = await apiClient.get('/search/stats');      
+      const data = response.data;
+      console.log(data);
+      if (data) {
+        setStatData(data);
+      } else {
+        setStatData(stat);
+      }
+    } catch (error) {
+      console.error('Error fetching stats', error);
+      setStatData
+    } finally {
+      setStatLoader(false);
+    }
+
+  };
+
+  useEffect(() => {
+    loadStats();
+  }, []);
 
   return (
     <div className="text-white">
       <header className="px-6 md:px-12 py-6 flex items-center justify-between">
-        <div className="text-xl tracking-[0.4em] uppercase text-gray-300">WEEMS</div>
+        <div className="text-xl tracking-[0.4em] uppercase text-gray-300">KAEMS</div>
         <nav className="hidden md:flex gap-8 text-sm text-gray-400">
           <a href="#features" className="hover:text-white transition-colors">
             Features
@@ -124,14 +155,25 @@ const LandingPage = () => {
             <p className="text-xs uppercase tracking-[0.4em] text-gray-400">Live Snapshot</p>
             <h3 className="text-2xl font-display">Exam Week • Digital Campus</h3>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            {stats.map((stat) => (
+          {statLoader ? <div className='w-[100%] h-[100px] flex items-center justify-center'>
+            <div className="w-10 h-10 border-4 border-gray-300 border-t-black rounded-full animate-spin"></div>
+          </div> : <div className="grid grid-cols-2 gap-4">
+            {/* {statData.map((sta) => (
               <div key={stat.label} className="p-4 rounded-2xl bg-white/5 border border-white/5">
-                <p className="text-sm text-gray-400">{stat.label}</p>
-                <p className="text-2xl font-semibold mt-2">{stat.value}</p>
+                <p className="text-sm text-gray-400">{sta.label}</p>
+                <p className="text-2xl font-semibold mt-2">{sta.value}</p>
               </div>
-            ))}
-          </div>
+            ))} */}
+            {
+              Object.entries(statData).map(([key, value]) => (
+                <div key={key} className="p-4 rounded-2xl bg-white/5 border border-white/5">
+                <p className="text-sm text-gray-400">{key}</p>
+                <p className="text-2xl font-semibold mt-2">{value}</p>
+              </div>
+              ))
+            }
+          </div>}
+
           <div className="rounded-2xl border border-white/10 p-4 flex items-center gap-3 bg-white/5 backdrop-blur">
             <FiCheckCircle className="text-brand-400" size={32} />
             <div>
@@ -202,7 +244,7 @@ const LandingPage = () => {
               to="/student-seat"
               className="px-6 py-3 rounded-2xl border border-white/15 bg-white/5 text-center"
             >
-              Student portal
+              Search Seat
             </Link>
             <Link
               to="/auth"

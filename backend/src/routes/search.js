@@ -4,17 +4,19 @@ const { authMiddleware } = require('../middleware/auth');
 
 const router = express.Router();
 
-router.get('/stats', authMiddleware(['admin']), async (_req, res) => {
+router.get('/stats', async (_req, res) => {
   try {
-    const [students, rooms, plans] = await Promise.all([
+    const [students, departments, rooms, plans] = await Promise.all([
       get('SELECT COUNT(*) as total FROM students'),
+      get('SELECT COUNT(*) as total FROM departments'),
       get('SELECT COUNT(*) as total FROM rooms'),
       get('SELECT COUNT(*) as total FROM seating_plans'),
     ]);
     res.json({
-      students: students.total,
-      rooms: rooms.total,
-      plans: plans.total,
+      'Seats arranged': students.total,
+      'Departements onboarded': departments.total,
+      'Exam rooms optimized': rooms.total,
+      'Seating plan generated': plans.total,
     });
   } catch (error) {
     console.error('Dashboard stats error', error);
