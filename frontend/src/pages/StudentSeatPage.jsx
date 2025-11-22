@@ -1,22 +1,26 @@
 import { useState } from 'react';
 import { FiSearch, FiMapPin, FiClock, FiCheckCircle } from 'react-icons/fi';
 import apiClient from '../services/api';
+import PlanSeatGridReadOnly from '../components/SeatingGrid';
 
 const StudentSeatPage = () => {
   const [roll, setRoll] = useState('');
   const [seat, setSeat] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [seatingPlanDate, setSeatingPlanDate] = useState([]);  
+
 
   const handleSearch = async (e) => {
-    e.preventDefault();
+    e.preventDefault();    
     if (!roll) return;
     setLoading(true);
     setError('');
     setSeat(null);
     try {
-      const { data } = await apiClient.get(`/students/seat/${roll}`);
+      const { data } = await apiClient.get(`/students/seat/${roll}/${seatingPlanDate}`);
       setSeat(data);
+      console.log(data);
     } catch (err) {
       setError(err.response?.data?.message || 'Seat not found yet.');
     } finally {
@@ -34,23 +38,37 @@ const StudentSeatPage = () => {
             Search using your roll number. If your plan is published, you will see room, row, column,
             and invigilator details instantly.
           </p>
-          <form className="flex flex-col sm:flex-row gap-4 mt-4" onSubmit={handleSearch}>
-            <div className="flex-1 flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4">
-              <FiSearch className="text-gray-400" />
-              <input
-                className="bg-transparent border-none outline-none w-full py-3 text-white placeholder-gray-400"
-                placeholder="Enter roll number e.g. CS-2023-017"
-                value={roll}
-                onChange={(e) => setRoll(e.target.value)}
-              />
+          <form className="flex flex-col gap-4 mt-4" onSubmit={handleSearch}>
+            <div className='flex w-full gap-10'>
+              <div className="flex-1 flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4">
+                <FiSearch className="text-gray-400" />
+                <input
+                  className="bg-transparent border-none outline-none w-full py-3 text-white placeholder-gray-400"
+                  placeholder="Enter roll number e.g. CS-2023-017"
+                  value={roll}
+                  onChange={(e) => setRoll(e.target.value)}
+                />
+              </div>
+              <label className="text-sm text-gray-400 flex flex-col gap-1">
+                Exam date
+                <input
+                  type='date'
+                  className="rounded-2xl bg-white/5 border border-white/10 px-4 py-3 text-white focus:border-brand-400 outline-none"
+                  required
+                  onChange={(e) => setSeatingPlanDate(e.target.value)}
+                />
+              </label>
             </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-6 py-3 rounded-2xl bg-gradient-to-r from-brand-500 to-accent font-medium"
-            >
-              {loading ? 'Searching...' : 'Check'}
-            </button>
+            <div className='flex justify-center items-center'>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-[50%] px-6 py-3 rounded-2xl bg-gradient-to-r from-brand-500 to-accent font-medium"
+              >
+                {loading ? 'Searching...' : 'Check'}
+              </button>
+            </div>
+
           </form>
           {error && <p className="text-rose-300 text-sm">{error}</p>}
         </div>
@@ -103,9 +121,12 @@ const StudentSeatPage = () => {
                 </div>
               </div>
             </div>
-          </div>
+          </div>          
         )}
-      </div>
+        {seat && (
+          <PlanSeatGridReadOnly planId={seat.plan_id} student_id={seat.student_id} />
+        )}
+      </div>      
     </div>
   );
 };

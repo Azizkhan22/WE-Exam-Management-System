@@ -27,7 +27,7 @@ router.get('/', authMiddleware(['admin']), async (_req, res) => {
   }
 });
 
-router.get('/:id', authMiddleware(), async (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
     const plan = await get('SELECT * FROM seating_plans WHERE id = ?', [req.params.id]);
     if (!plan) return res.status(404).json({ message: 'Plan not found' });

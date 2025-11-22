@@ -113,11 +113,15 @@ router.get('/roll/:rollNo', async (req, res) => {
   }
 });
 
-router.get('/seat/:rollNo', async (req, res) => {
+router.get('/seat/:rollNo/:date', async (req, res) => {
   try {
     const student = await get('SELECT id FROM students WHERE roll_no = ?', [req.params.rollNo]);
+    const seating_plan = await get('SELECT id FROM seating_plans WHERE plan_date = ?', [req.params.date]);
+    console.log(seating_plan);
     if (!student) {
       return res.status(404).json({ message: 'Student not found' });
+    } else if (!seating_plan) {
+      return res.status(404).json({ message: 'No seating arrangement found for this date' });
     }
 
     const seat = await get(
@@ -130,10 +134,10 @@ router.get('/seat/:rollNo', async (req, res) => {
        JOIN students s ON s.id = asp.student_id
        JOIN semesters sem ON sem.id = s.semester_id
        JOIN departments d ON d.id = sem.department_id
-       WHERE asp.student_id = ?
+       WHERE asp.student_id = ? AND asp.plan_id = ?
        ORDER BY sp.plan_date DESC
        LIMIT 1`,
-      [student.id]
+      [student.id, seating_plan.id]
     );
 
     if (!seat) {
