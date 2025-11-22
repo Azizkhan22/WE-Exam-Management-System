@@ -36,14 +36,6 @@ export const useAuthStore = create((set, get) => ({
     return data.user;
   },
 
-  registerStudent: async (payload) => {
-    const { data } = await apiClient.post('/auth/register', payload);
-    setAuthToken(data.token);
-    localStorage.setItem('weems_token', data.token);
-    set({ user: data.user, token: data.token });
-    return data.user;
-  },
-
   logout: () => {
     setAuthToken(null);
     localStorage.removeItem('weems_token');

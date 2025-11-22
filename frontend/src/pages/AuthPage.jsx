@@ -5,21 +5,12 @@ import apiClient from '../services/api';
 import { useAuthStore } from '../store/authStore';
 
 const AuthPage = () => {
-  const navigate = useNavigate();
-  const { login, registerStudent, user } = useAuthStore();
+  const navigate = useNavigate();  
   const [mode, setMode] = useState('login');
   const [semesters, setSemesters] = useState([]);
   const [status, setStatus] = useState({ type: '', message: '' });
   const [loading, setLoading] = useState(false);
   const [loginFields, setLoginFields] = useState({ email: '', password: '' });
-  const [registerFields, setRegisterFields] = useState({
-    fullName: '',
-    email: '',
-    password: '',
-    rollNo: '',
-    semesterId: '',
-    seatPref: '',
-  });
 
   useEffect(() => {
     const loadSemesters = async () => {
@@ -33,56 +24,36 @@ const AuthPage = () => {
     loadSemesters();
   }, []);
 
-  useEffect(() => {
-    if (user) {
-      if (user.role === 'admin') {
-        navigate('/dashboard', { replace: true });
-      } else {
-        navigate('/student-seat', { replace: true });
-      }
-    }
-  }, [user, navigate]);
-
   const sortedSemesters = useMemo(
     () => [...semesters].sort((a, b) => a.title.localeCompare(b.title)),
     [semesters]
   );
-
+  const login = useAuthStore((state) => state.login);
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     setStatus({ type: '', message: '' });
+  
     try {
       const loggedUser = await login(loginFields);
-      setStatus({ type: 'success', message: `Welcome back ${loggedUser.fullName}` });
-      setTimeout(() => navigate(loggedUser.role === 'admin' ? '/dashboard' : '/student-seat'), 500);
+  
+      setStatus({
+        type: 'success',
+        message: `Welcome back ${loggedUser.fullName}`,
+      });
+  
+      setTimeout(() => {
+        navigate(loggedUser.role === 'admin' ? '/dashboard' : '/student-seat');
+      }, 500);
+  
     } catch (error) {
       setStatus({
         type: 'error',
-        message: error.response?.data?.message || 'Unable to log in. Check credentials.',
+        message:
+          error.response?.data?.message ||
+          'Unable to log in. Check credentials.',
       });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRegister = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setStatus({ type: '', message: '' });
-    try {
-      if (!registerFields.semesterId) {
-        throw new Error('Please select a semester');
-      }
-      const newUser = await registerStudent(registerFields);
-      setStatus({
-        type: 'success',
-        message: `Welcome ${newUser.fullName}. Redirecting...`,
-      });
-      setTimeout(() => navigate('/student-seat', { replace: true }), 600);
-    } catch (error) {
-      const message = error.response?.data?.message || error.message || 'Failed to register';
-      setStatus({ type: 'error', message });
+  
     } finally {
       setLoading(false);
     }
@@ -94,54 +65,18 @@ const AuthPage = () => {
         <div className="glass p-8 space-y-6 border border-white/10">
           <div>
             <p className="text-xs uppercase tracking-[0.4em] text-gray-400">Portal access</p>
-            <h2 className="text-3xl font-display mt-2">
-              {mode === 'login' ? 'Admin / Invigilator Login' : 'Student Registration'}
-            </h2>
+            <h2 className="text-3xl font-display mt-2">Admin / Invigilator Login</h2>
             <p className="text-gray-400 mt-2">
-              {mode === 'login'
-                ? 'Access the immersive dashboard, CRUD suite, allocation engine, and analytics.'
-                : 'Create your account tied to your roll number. Seats sync automatically.'}
+              Access the immersive dashboard, CRUD suite, allocation engine, and analytics.
             </p>
-          </div>
-
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={() => setMode('login')}
-              className={`flex-1 px-4 py-3 rounded-2xl border ${
-                mode === 'login'
-                  ? 'border-brand-400 bg-brand-400/10'
-                  : 'border-white/10 hover:border-white/30'
-              } transition`}
-            >
-              <div className="flex items-center justify-center gap-2 font-medium">
-                <FiLogIn />
-                Login
-              </div>
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode('register')}
-              className={`flex-1 px-4 py-3 rounded-2xl border ${
-                mode === 'register'
-                  ? 'border-brand-400 bg-brand-400/10'
-                  : 'border-white/10 hover:border-white/30'
-              } transition`}
-            >
-              <div className="flex items-center justify-center gap-2 font-medium">
-                <FiUserPlus />
-                Register
-              </div>
-            </button>
-          </div>
+          </div>         
 
           {status.message && (
             <div
-              className={`rounded-xl px-4 py-3 text-sm ${
-                status.type === 'success'
+              className={`rounded-xl px-4 py-3 text-sm ${status.type === 'success'
                   ? 'bg-emerald-500/10 border border-emerald-500/40 text-emerald-200'
                   : 'bg-rose-500/10 border border-rose-500/40 text-rose-200'
-              }`}
+                }`}
             >
               {status.message}
             </div>
