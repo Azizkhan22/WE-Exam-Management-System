@@ -67,6 +67,19 @@ const initializeDatabase = async () => {
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE CASCADE
     )`,
+    `CREATE TABLE IF NOT EXISTS courses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      code TEXT NOT NULL UNIQUE,
+      title TEXT NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `CREATE TABLE IF NOT EXISTS semester_courses (
+      semester_id INTEGER NOT NULL,
+      course_id INTEGER NOT NULL,
+      PRIMARY KEY (semester_id, course_id),
+      FOREIGN KEY (semester_id) REFERENCES semesters(id) ON DELETE CASCADE,
+      FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
+    )`,
     `CREATE TABLE IF NOT EXISTS students (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       semester_id INTEGER NOT NULL,
@@ -75,6 +88,13 @@ const initializeDatabase = async () => {
       seat_pref TEXT,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (semester_id) REFERENCES semesters(id) ON DELETE CASCADE
+    )`,
+    `CREATE TABLE IF NOT EXISTS student_courses (
+      student_id INTEGER NOT NULL,
+      course_id INTEGER NOT NULL,
+      PRIMARY KEY (student_id, course_id),
+      FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
+      FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
     )`,
     `CREATE TABLE IF NOT EXISTS rooms (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

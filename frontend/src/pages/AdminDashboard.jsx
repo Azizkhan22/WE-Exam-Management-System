@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FiUsers, FiGrid, FiLayers, FiDownload, FiRefreshCw } from 'react-icons/fi';
+import { FiUsers, FiGrid, FiLayers, FiDownload, FiRefreshCw, FiEdit2, FiTrash2, FiX } from 'react-icons/fi';
 import dayjs from 'dayjs';
 import jsPDF from 'jspdf';
 import apiClient from '../services/api';
@@ -126,6 +126,8 @@ const AdminDashboard = () => {
   const [departments, setDepartments] = useState([]);
   const [semesters, setSemesters] = useState([]);
   const [rooms, setRooms] = useState([]);
+  const [courses, setCourses] = useState([]);
+  const [students, setStudents] = useState([]);
   const [stats, setStats] = useState({ students: 0, rooms: 0, plans: 0 });
   const [plans, setPlans] = useState([]);
   const [planDetail, setPlanDetail] = useState(null);
@@ -135,6 +137,11 @@ const AdminDashboard = () => {
   const [swapSeat, setSwapSeat] = useState(null);
   const [activePlanId, setActivePlanId] = useState(null);
   const [activeRoomId, setActiveRoomId] = useState(null);
+  const [editingDept, setEditingDept] = useState(null);
+  const [editingSem, setEditingSem] = useState(null);
+  const [editingRoom, setEditingRoom] = useState(null);
+  const [editingStudent, setEditingStudent] = useState(null);
+  const [editingCourse, setEditingCourse] = useState(null);
   const [primaryForm, setPrimaryForm] = useState({
     title: '',
     planDate: dayjs().format('YYYY-MM-DD'),
@@ -164,16 +171,20 @@ const AdminDashboard = () => {
   const loadCoreData = async (preferredPlanId = null) => {
     setLoading(true);
     try {
-      const [deps, sems, rms, statsRes, plansRes] = await Promise.all([
+      const [deps, sems, rms, crs, studs, statsRes, plansRes] = await Promise.all([
         apiClient.get('/catalog/departments'),
         apiClient.get('/catalog/semesters'),
         apiClient.get('/catalog/rooms'),
+        apiClient.get('/catalog/courses'),
+        apiClient.get('/students'),
         apiClient.get('/search/stats'),
         apiClient.get('/plans'),
       ]);
       setDepartments(deps.data);
       setSemesters(sems.data);
       setRooms(rms.data);
+      setCourses(crs.data);
+      setStudents(studs.data);
       setStats(statsRes.data);
       setPlans(plansRes.data);
       if (plansRes.data.length) {
@@ -226,9 +237,30 @@ const AdminDashboard = () => {
     try {
       await apiClient.post(endpoint, payload);
       setFormStatus('Saved successfully');
-      await loadCoreData();
+      await loadCoreData(activePlanId);
     } catch (error) {
       setFormStatus(error.response?.data?.message || 'Failed to save');
+    }
+  };
+
+  const handleEntityUpdate = async (endpoint, id, payload) => {
+    try {
+      await apiClient.put(`${endpoint}/${id}`, payload);
+      setFormStatus('Updated successfully');
+      await loadCoreData(activePlanId);
+    } catch (error) {
+      setFormStatus(error.response?.data?.message || 'Failed to update');
+    }
+  };
+
+  const handleEntityDelete = async (endpoint, id) => {
+    if (!window.confirm('Are you sure you want to delete this item?')) return;
+    try {
+      await apiClient.delete(`${endpoint}/${id}`);
+      setFormStatus('Deleted successfully');
+      await loadCoreData(activePlanId);
+    } catch (error) {
+      setFormStatus(error.response?.data?.message || 'Failed to delete');
     }
   };
 
@@ -551,133 +583,476 @@ const AdminDashboard = () => {
         </div>
       </section>
 
-      <section className="grid md:grid-cols-2 xl:grid-cols-4 gap-6">
+      <section className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+        {/* Departments */}
         <div className="glass p-6 border border-white/10 space-y-4">
           <div>
             <p className="text-xs uppercase tracking-[0.4em] text-gray-400">Departments</p>
             <h3 className="text-xl font-display">Add / edit quickly</h3>
           </div>
-          <form
-            className="space-y-3"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const formData = new FormData(e.currentTarget);
-              handleEntityCreate('/catalog/departments', { name: formData.get('deptName') });
-              e.currentTarget.reset();
-            }}
-          >
-            <Input label="Department name" name="deptName" placeholder="Computer Science" required />
-            <button type="submit" className="w-full py-2 rounded-2xl bg-white/10 border border-white/10">
-              Save department
-            </button>
-          </form>
+          {editingDept ? (
+            <form
+              className="space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                handleEntityUpdate('/catalog/departments', editingDept.id, { name: formData.get('deptName') });
+                setEditingDept(null);
+                e.currentTarget.reset();
+              }}
+            >
+              <Input label="Department name" name="deptName" defaultValue={editingDept.name} required />
+              <div className="flex gap-2">
+                <button type="submit" className="flex-1 py-2 rounded-2xl bg-brand-500/20 border border-brand-500/40">
+                  Update
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingDept(null)}
+                  className="px-3 py-2 rounded-2xl bg-white/10 border border-white/10"
+                >
+                  <FiX />
+                </button>
+              </div>
+            </form>
+          ) : (
+            <form
+              className="space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                handleEntityCreate('/catalog/departments', { name: formData.get('deptName') });
+                e.currentTarget.reset();
+              }}
+            >
+              <Input label="Department name" name="deptName" placeholder="Computer Science" required />
+              <button type="submit" className="w-full py-2 rounded-2xl bg-white/10 border border-white/10">
+                Save department
+              </button>
+            </form>
+          )}
+          <div className="border-t border-white/5 pt-3 space-y-2 max-h-48 overflow-auto no-scrollbar">
+            {departments.map((dept) => (
+              <div key={dept.id} className="flex items-center justify-between p-2 rounded-xl bg-white/5">
+                <span className="text-sm truncate flex-1">{dept.name}</span>
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setEditingDept(dept)}
+                    className="p-1.5 rounded-lg hover:bg-white/10"
+                  >
+                    <FiEdit2 size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleEntityDelete('/catalog/departments', dept.id)}
+                    className="p-1.5 rounded-lg hover:bg-red-500/20"
+                  >
+                    <FiTrash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
+        {/* Semesters */}
         <div className="glass p-6 border border-white/10 space-y-4">
           <div>
             <p className="text-xs uppercase tracking-[0.4em] text-gray-400">Semesters</p>
             <h3 className="text-xl font-display">Per department</h3>
           </div>
-          <form
-            className="space-y-3"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const formData = new FormData(e.currentTarget);
-              handleEntityCreate('/catalog/semesters', {
-                departmentId: Number(formData.get('semesterDepartment')),
-                title: formData.get('semesterTitle'),
-                code: formData.get('semesterCode'),
-                examDate: formData.get('semesterDate'),
-              });
-              e.currentTarget.reset();
-            }}
-          >
-            <Select label="Department" name="semesterDepartment" required>
-              <option value="">Select</option>
-              {departments.map((dept) => (
-                <option key={dept.id} value={dept.id}>
-                  {dept.name}
-                </option>
-              ))}
-            </Select>
-            <Input label="Semester title" name="semesterTitle" placeholder="BSCS - Term V" required />
-            <Input label="Semester code" name="semesterCode" placeholder="CS-T5" required />
-            <Input label="Exam date" name="semesterDate" type="date" required />
-            <button type="submit" className="w-full py-2 rounded-2xl bg-white/10 border border-white/10">
-              Save semester
-            </button>
-          </form>
+          {editingSem ? (
+            <form
+              className="space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                handleEntityUpdate('/catalog/semesters', editingSem.id, {
+                  departmentId: Number(formData.get('semesterDepartment')),
+                  title: formData.get('semesterTitle'),
+                  code: formData.get('semesterCode'),
+                  examDate: formData.get('semesterDate'),
+                });
+                setEditingSem(null);
+                e.currentTarget.reset();
+              }}
+            >
+              <Select label="Department" name="semesterDepartment" defaultValue={editingSem.department_id} required>
+                <option value="">Select</option>
+                {departments.map((dept) => (
+                  <option key={dept.id} value={dept.id}>
+                    {dept.name}
+                  </option>
+                ))}
+              </Select>
+              <Input label="Semester title" name="semesterTitle" defaultValue={editingSem.title} required />
+              <Input label="Semester code" name="semesterCode" defaultValue={editingSem.code} required />
+              <Input label="Exam date" name="semesterDate" type="date" defaultValue={editingSem.exam_date} required />
+              <div className="flex gap-2">
+                <button type="submit" className="flex-1 py-2 rounded-2xl bg-brand-500/20 border border-brand-500/40">
+                  Update
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingSem(null)}
+                  className="px-3 py-2 rounded-2xl bg-white/10 border border-white/10"
+                >
+                  <FiX />
+                </button>
+              </div>
+            </form>
+          ) : (
+            <form
+              className="space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                handleEntityCreate('/catalog/semesters', {
+                  departmentId: Number(formData.get('semesterDepartment')),
+                  title: formData.get('semesterTitle'),
+                  code: formData.get('semesterCode'),
+                  examDate: formData.get('semesterDate'),
+                });
+                e.currentTarget.reset();
+              }}
+            >
+              <Select label="Department" name="semesterDepartment" required>
+                <option value="">Select</option>
+                {departments.map((dept) => (
+                  <option key={dept.id} value={dept.id}>
+                    {dept.name}
+                  </option>
+                ))}
+              </Select>
+              <Input label="Semester title" name="semesterTitle" placeholder="BSCS - Term V" required />
+              <Input label="Semester code" name="semesterCode" placeholder="CS-T5" required />
+              <Input label="Exam date" name="semesterDate" type="date" required />
+              <button type="submit" className="w-full py-2 rounded-2xl bg-white/10 border border-white/10">
+                Save semester
+              </button>
+            </form>
+          )}
+          <div className="border-t border-white/5 pt-3 space-y-2 max-h-48 overflow-auto no-scrollbar">
+            {semesters.map((sem) => (
+              <div key={sem.id} className="flex items-center justify-between p-2 rounded-xl bg-white/5">
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm block truncate">{sem.title}</span>
+                  <span className="text-xs text-gray-500">{sem.code}</span>
+                </div>
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setEditingSem(sem)}
+                    className="p-1.5 rounded-lg hover:bg-white/10"
+                  >
+                    <FiEdit2 size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleEntityDelete('/catalog/semesters', sem.id)}
+                    className="p-1.5 rounded-lg hover:bg-red-500/20"
+                  >
+                    <FiTrash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
+        {/* Rooms */}
         <div className="glass p-6 border border-white/10 space-y-4">
           <div>
             <p className="text-xs uppercase tracking-[0.4em] text-gray-400">Rooms</p>
             <h3 className="text-xl font-display">Capacity + layout</h3>
           </div>
-          <form
-            className="space-y-3"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const formData = new FormData(e.currentTarget);
-              handleEntityCreate('/catalog/rooms', {
-                code: formData.get('roomCode'),
-                name: formData.get('roomName'),
-                capacity: Number(formData.get('roomCapacity')),
-                rows: Number(formData.get('roomRows')),
-                cols: Number(formData.get('roomCols')),
-                invigilatorName: formData.get('invigilator'),
-              });
-              e.currentTarget.reset();
-            }}
-          >
-            <Input label="Room code" name="roomCode" placeholder="LAB-01" required />
-            <Input label="Room name" name="roomName" placeholder="Innovation Lab" required />
-            <div className="grid grid-cols-3 gap-2">
-              <Input label="Cap" name="roomCapacity" type="number" required />
-              <Input label="Rows" name="roomRows" type="number" required />
-              <Input label="Cols" name="roomCols" type="number" required />
-            </div>
-            <Input label="Invigilator" name="invigilator" placeholder="Prof. Nauman" />
-            <button type="submit" className="w-full py-2 rounded-2xl bg-white/10 border border-white/10">
-              Save room
-            </button>
-          </form>
+          {editingRoom ? (
+            <form
+              className="space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                handleEntityUpdate('/catalog/rooms', editingRoom.id, {
+                  code: formData.get('roomCode'),
+                  name: formData.get('roomName'),
+                  capacity: Number(formData.get('roomCapacity')),
+                  rows: Number(formData.get('roomRows')),
+                  cols: Number(formData.get('roomCols')),
+                  invigilatorName: formData.get('invigilator'),
+                });
+                setEditingRoom(null);
+                e.currentTarget.reset();
+              }}
+            >
+              <Input label="Room code" name="roomCode" defaultValue={editingRoom.code} required />
+              <Input label="Room name" name="roomName" defaultValue={editingRoom.name} required />
+              <div className="grid grid-cols-3 gap-2">
+                <Input label="Cap" name="roomCapacity" type="number" defaultValue={editingRoom.capacity} required />
+                <Input label="Rows" name="roomRows" type="number" defaultValue={editingRoom.rows} required />
+                <Input label="Cols" name="roomCols" type="number" defaultValue={editingRoom.cols} required />
+              </div>
+              <Input label="Invigilator" name="invigilator" defaultValue={editingRoom.invigilator_name || ''} />
+              <div className="flex gap-2">
+                <button type="submit" className="flex-1 py-2 rounded-2xl bg-brand-500/20 border border-brand-500/40">
+                  Update
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingRoom(null)}
+                  className="px-3 py-2 rounded-2xl bg-white/10 border border-white/10"
+                >
+                  <FiX />
+                </button>
+              </div>
+            </form>
+          ) : (
+            <form
+              className="space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                handleEntityCreate('/catalog/rooms', {
+                  code: formData.get('roomCode'),
+                  name: formData.get('roomName'),
+                  capacity: Number(formData.get('roomCapacity')),
+                  rows: Number(formData.get('roomRows')),
+                  cols: Number(formData.get('roomCols')),
+                  invigilatorName: formData.get('invigilator'),
+                });
+                e.currentTarget.reset();
+              }}
+            >
+              <Input label="Room code" name="roomCode" placeholder="LAB-01" required />
+              <Input label="Room name" name="roomName" placeholder="Innovation Lab" required />
+              <div className="grid grid-cols-3 gap-2">
+                <Input label="Cap" name="roomCapacity" type="number" required />
+                <Input label="Rows" name="roomRows" type="number" required />
+                <Input label="Cols" name="roomCols" type="number" required />
+              </div>
+              <Input label="Invigilator" name="invigilator" placeholder="Prof. Nauman" />
+              <button type="submit" className="w-full py-2 rounded-2xl bg-white/10 border border-white/10">
+                Save room
+              </button>
+            </form>
+          )}
+          <div className="border-t border-white/5 pt-3 space-y-2 max-h-48 overflow-auto no-scrollbar">
+            {rooms.map((room) => (
+              <div key={room.id} className="flex items-center justify-between p-2 rounded-xl bg-white/5">
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm block truncate">{room.name}</span>
+                  <span className="text-xs text-gray-500">{room.code} • {room.capacity} seats</span>
+                </div>
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setEditingRoom(room)}
+                    className="p-1.5 rounded-lg hover:bg-white/10"
+                  >
+                    <FiEdit2 size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleEntityDelete('/catalog/rooms', room.id)}
+                    className="p-1.5 rounded-lg hover:bg-red-500/20"
+                  >
+                    <FiTrash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
+        {/* Students */}
         <div className="glass p-6 border border-white/10 space-y-4">
           <div>
             <p className="text-xs uppercase tracking-[0.4em] text-gray-400">Students</p>
             <h3 className="text-xl font-display">Enroll & sync</h3>
           </div>
-          <form
-            className="space-y-3"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const formData = new FormData(e.currentTarget);
-              handleEntityCreate('/students', {
-                fullName: formData.get('studentName'),
-                rollNo: formData.get('studentRoll'),
-                semesterId: Number(formData.get('studentSemester')),
-                seatPref: formData.get('seatPref'),
-              });
-              e.currentTarget.reset();
-            }}
-          >
-            <Input label="Full name" name="studentName" placeholder="Areeba Khan" required />
-            <Input label="Roll number" name="studentRoll" placeholder="CS-23-055" required />
-            <Select label="Semester" name="studentSemester" required>
-              <option value="">Select</option>
-              {semesters.map((sem) => (
-                <option key={sem.id} value={sem.id}>
-                  {sem.title}
-                </option>
-              ))}
-            </Select>
-            <Input label="Seat preference" name="seatPref" placeholder="Optional note" />
-            <button type="submit" className="w-full py-2 rounded-2xl bg-white/10 border border-white/10">
-              Save student
-            </button>
-          </form>
+          {editingStudent ? (
+            <form
+              className="space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                handleEntityUpdate('/students', editingStudent.id, {
+                  fullName: formData.get('studentName'),
+                  rollNo: formData.get('studentRoll'),
+                  semesterId: Number(formData.get('studentSemester')),
+                  seatPref: formData.get('seatPref'),
+                });
+                setEditingStudent(null);
+                e.currentTarget.reset();
+              }}
+            >
+              <Input label="Full name" name="studentName" defaultValue={editingStudent.full_name} required />
+              <Input label="Roll number" name="studentRoll" defaultValue={editingStudent.roll_no} required />
+              <Select label="Semester" name="studentSemester" defaultValue={editingStudent.semester_id} required>
+                <option value="">Select</option>
+                {semesters.map((sem) => (
+                  <option key={sem.id} value={sem.id}>
+                    {sem.title}
+                  </option>
+                ))}
+              </Select>
+              <Input label="Seat preference" name="seatPref" defaultValue={editingStudent.seat_pref || ''} />
+              <div className="flex gap-2">
+                <button type="submit" className="flex-1 py-2 rounded-2xl bg-brand-500/20 border border-brand-500/40">
+                  Update
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingStudent(null)}
+                  className="px-3 py-2 rounded-2xl bg-white/10 border border-white/10"
+                >
+                  <FiX />
+                </button>
+              </div>
+            </form>
+          ) : (
+            <form
+              className="space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                handleEntityCreate('/students', {
+                  fullName: formData.get('studentName'),
+                  rollNo: formData.get('studentRoll'),
+                  semesterId: Number(formData.get('studentSemester')),
+                  seatPref: formData.get('seatPref'),
+                });
+                e.currentTarget.reset();
+              }}
+            >
+              <Input label="Full name" name="studentName" placeholder="Areeba Khan" required />
+              <Input label="Roll number" name="studentRoll" placeholder="CS-23-055" required />
+              <Select label="Semester" name="studentSemester" required>
+                <option value="">Select</option>
+                {semesters.map((sem) => (
+                  <option key={sem.id} value={sem.id}>
+                    {sem.title}
+                  </option>
+                ))}
+              </Select>
+              <Input label="Seat preference" name="seatPref" placeholder="Optional note" />
+              <button type="submit" className="w-full py-2 rounded-2xl bg-white/10 border border-white/10">
+                Save student
+              </button>
+            </form>
+          )}
+          <div className="border-t border-white/5 pt-3 space-y-2 max-h-48 overflow-auto no-scrollbar">
+            {students.slice(0, 10).map((student) => (
+              <div key={student.id} className="flex items-center justify-between p-2 rounded-xl bg-white/5">
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm block truncate">{student.full_name}</span>
+                  <span className="text-xs text-gray-500">{student.roll_no}</span>
+                </div>
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setEditingStudent(student)}
+                    className="p-1.5 rounded-lg hover:bg-white/10"
+                  >
+                    <FiEdit2 size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleEntityDelete('/students', student.id)}
+                    className="p-1.5 rounded-lg hover:bg-red-500/20"
+                  >
+                    <FiTrash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+            {students.length > 10 && (
+              <p className="text-xs text-gray-500 text-center">+{students.length - 10} more</p>
+            )}
+          </div>
+        </div>
+
+        {/* Courses */}
+        <div className="glass p-6 border border-white/10 space-y-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.4em] text-gray-400">Courses</p>
+            <h3 className="text-xl font-display">Manage courses</h3>
+          </div>
+          {editingCourse ? (
+            <form
+              className="space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                handleEntityUpdate('/catalog/courses', editingCourse.id, {
+                  code: formData.get('courseCode'),
+                  title: formData.get('courseTitle'),
+                });
+                setEditingCourse(null);
+                e.currentTarget.reset();
+              }}
+            >
+              <Input label="Course code" name="courseCode" defaultValue={editingCourse.code} required />
+              <Input label="Course title" name="courseTitle" defaultValue={editingCourse.title} required />
+              <div className="flex gap-2">
+                <button type="submit" className="flex-1 py-2 rounded-2xl bg-brand-500/20 border border-brand-500/40">
+                  Update
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingCourse(null)}
+                  className="px-3 py-2 rounded-2xl bg-white/10 border border-white/10"
+                >
+                  <FiX />
+                </button>
+              </div>
+            </form>
+          ) : (
+            <form
+              className="space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                handleEntityCreate('/catalog/courses', {
+                  code: formData.get('courseCode'),
+                  title: formData.get('courseTitle'),
+                });
+                e.currentTarget.reset();
+              }}
+            >
+              <Input label="Course code" name="courseCode" placeholder="CS-301" required />
+              <Input label="Course title" name="courseTitle" placeholder="Data Structures" required />
+              <button type="submit" className="w-full py-2 rounded-2xl bg-white/10 border border-white/10">
+                Save course
+              </button>
+            </form>
+          )}
+          <div className="border-t border-white/5 pt-3 space-y-2 max-h-48 overflow-auto no-scrollbar">
+            {courses.map((course) => (
+              <div key={course.id} className="flex items-center justify-between p-2 rounded-xl bg-white/5">
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm block truncate">{course.title}</span>
+                  <span className="text-xs text-gray-500">{course.code}</span>
+                </div>
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setEditingCourse(course)}
+                    className="p-1.5 rounded-lg hover:bg-white/10"
+                  >
+                    <FiEdit2 size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleEntityDelete('/catalog/courses', course.id)}
+                    className="p-1.5 rounded-lg hover:bg-red-500/20"
+                  >
+                    <FiTrash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
     </div>

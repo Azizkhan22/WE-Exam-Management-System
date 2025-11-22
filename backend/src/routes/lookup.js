@@ -168,5 +168,141 @@ router.delete('/rooms/:id', authMiddleware(['admin']), async (req, res) => {
   }
 });
 
+// Courses
+router.get('/courses', async (_req, res) => {
+  try {
+    const courses = await all('SELECT * FROM courses ORDER BY title ASC');
+    res.json(courses);
+  } catch (error) {
+    console.error('Fetch courses error', error);
+    res.status(500).json({ message: 'Failed to fetch courses' });
+  }
+});
+
+router.post('/courses', authMiddleware(['admin']), async (req, res) => {
+  try {
+    const { code, title } = req.body;
+    if (!code || !title) return res.status(400).json({ message: 'Code and title are required' });
+    const insert = await run('INSERT INTO courses (code, title) VALUES (?, ?)', [code.trim(), title.trim()]);
+    const course = await get('SELECT * FROM courses WHERE id = ?', [insert.lastID]);
+    res.status(201).json(course);
+  } catch (error) {
+    console.error('Create course error', error);
+    res.status(500).json({ message: 'Failed to create course' });
+  }
+});
+
+router.put('/courses/:id', authMiddleware(['admin']), async (req, res) => {
+  try {
+    const { code, title } = req.body;
+    await run('UPDATE courses SET code = ?, title = ? WHERE id = ?', [code, title, req.params.id]);
+    const course = await get('SELECT * FROM courses WHERE id = ?', [req.params.id]);
+    res.json(course);
+  } catch (error) {
+    console.error('Update course error', error);
+    res.status(500).json({ message: 'Failed to update course' });
+  }
+});
+
+router.delete('/courses/:id', authMiddleware(['admin']), async (req, res) => {
+  try {
+    await run('DELETE FROM courses WHERE id = ?', [req.params.id]);
+    res.status(204).end();
+  } catch (error) {
+    console.error('Delete course error', error);
+    res.status(500).json({ message: 'Failed to delete course' });
+  }
+});
+
+// Semester-Courses mapping
+router.get('/semester-courses', async (_req, res) => {
+  try {
+    const rows = await all(
+      `SELECT sc.semester_id, sc.course_id, sem.title as semester_title, c.code as course_code, c.title as course_title
+       FROM semester_courses sc
+       JOIN semesters sem ON sem.id = sc.semester_id
+       JOIN courses c ON c.id = sc.course_id
+       ORDER BY sem.id, c.title`
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error('Fetch semester courses error', error);
+    res.status(500).json({ message: 'Failed to fetch semester courses' });
+  }
+});
+
+router.post('/semester-courses', authMiddleware(['admin']), async (req, res) => {
+  try {
+    const { semesterId, courseId } = req.body;
+    if (!semesterId || !courseId) return res.status(400).json({ message: 'semesterId and courseId required' });
+    await run('INSERT INTO semester_courses (semester_id, course_id) VALUES (?, ?)', [semesterId, courseId]);
+    res.status(201).json({ semesterId, courseId });
+  } catch (error) {
+    console.error('Create semester-course mapping error', error);
+    res.status(500).json({ message: 'Failed to create semester-course mapping' });
+  }
+});
+
+router.delete('/semester-courses/:semesterId/:courseId', authMiddleware(['admin']), async (req, res) => {
+  try {
+    const { semesterId, courseId } = req.params;
+    await run('DELETE FROM semester_courses WHERE semester_id = ? AND course_id = ?', [semesterId, courseId]);
+    res.status(204).end();
+  } catch (error) {
+    console.error('Delete semester-course mapping error', error);
+    res.status(500).json({ message: 'Failed to delete semester-course mapping' });
+  }
+});
+
+// Student-Courses mapping
+router.get('/student-courses', async (req, res) => {
+  try {
+    const { studentId } = req.query;
+    if (studentId) {
+      const rows = await all(
+        `SELECT sc.student_id, sc.course_id, c.code as course_code, c.title as course_title
+         FROM student_courses sc
+         JOIN courses c ON c.id = sc.course_id
+         WHERE sc.student_id = ?`,
+        [studentId]
+      );
+      return res.json(rows);
+    }
+    const rows = await all(
+      `SELECT sc.student_id, sc.course_id, c.code as course_code, c.title as course_title
+       FROM student_courses sc
+       JOIN courses c ON c.id = sc.course_id
+       ORDER BY sc.student_id`
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error('Fetch student courses error', error);
+    res.status(500).json({ message: 'Failed to fetch student courses' });
+  }
+});
+
+router.post('/student-courses', authMiddleware(['admin']), async (req, res) => {
+  try {
+    const { studentId, courseId } = req.body;
+    if (!studentId || !courseId) return res.status(400).json({ message: 'studentId and courseId required' });
+    await run('INSERT INTO student_courses (student_id, course_id) VALUES (?, ?)', [studentId, courseId]);
+    res.status(201).json({ studentId, courseId });
+  } catch (error) {
+    console.error('Create student-course mapping error', error);
+    res.status(500).json({ message: 'Failed to create student-course mapping' });
+  }
+});
+
+router.delete('/student-courses/:studentId/:courseId', authMiddleware(['admin']), async (req, res) => {
+  try {
+    const { studentId, courseId } = req.params;
+    await run('DELETE FROM student_courses WHERE student_id = ? AND course_id = ?', [studentId, courseId]);
+    res.status(204).end();
+  } catch (error) {
+    console.error('Delete student-course mapping error', error);
+    res.status(500).json({ message: 'Failed to delete student-course mapping' });
+  }
+});
+
 module.exports = router;
 
