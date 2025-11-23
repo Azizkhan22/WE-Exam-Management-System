@@ -184,7 +184,7 @@ const AuthPage = () => {
                   <option value="">Select semester</option>
                   {sortedSemesters.map((sem) => (
                     <option key={sem.id} value={sem.id}>
-                      {sem.title} • {sem.code}
+                      {sem.title}
                     </option>
                   ))}
                 </select>

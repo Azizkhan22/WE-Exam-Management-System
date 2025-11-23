@@ -50,6 +50,76 @@ const all = (sql, params = []) =>
     });
   });
 
+const migrateDatabase = async () => {
+  try {
+    // Check if semester_courses table exists and has exam_date column
+    try {
+      const semesterCoursesInfo = await all("PRAGMA table_info(semester_courses)");
+      const hasExamDate = semesterCoursesInfo.some(col => col.name === 'exam_date');
+      
+      if (!hasExamDate) {
+        console.log('Adding exam_date column to semester_courses table...');
+        await run('ALTER TABLE semester_courses ADD COLUMN exam_date TEXT');
+      }
+    } catch (error) {
+      // Table might not exist yet, that's okay
+      if (!error.message.includes('no such table')) {
+        throw error;
+      }
+    }
+
+    // Check if semesters table has code or exam_date columns that need to be removed
+    try {
+      const semestersInfo = await all("PRAGMA table_info(semesters)");
+      const hasCode = semestersInfo.some(col => col.name === 'code');
+      const hasExamDate = semestersInfo.some(col => col.name === 'exam_date');
+      
+      if (hasCode || hasExamDate) {
+        console.log('Migrating semesters table to remove code and exam_date columns...');
+        // SQLite doesn't support DROP COLUMN, so we need to recreate the table
+        await run('BEGIN TRANSACTION');
+        
+        // Create new table without code and exam_date columns
+        await run(`CREATE TABLE semesters_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          department_id INTEGER NOT NULL,
+          title TEXT NOT NULL,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE CASCADE
+        )`);
+        
+        // Copy data (excluding code and exam_date columns)
+        await run('INSERT INTO semesters_new (id, department_id, title, created_at) SELECT id, department_id, title, created_at FROM semesters');
+        
+        // Drop old table
+        await run('DROP TABLE semesters');
+        
+        // Rename new table
+        await run('ALTER TABLE semesters_new RENAME TO semesters');
+        
+        await run('COMMIT');
+        console.log('Semesters table migration completed');
+      }
+    } catch (error) {
+      // Table might not exist yet, that's okay
+      if (!error.message.includes('no such table')) {
+        await run('ROLLBACK').catch(() => {});
+        throw error;
+      }
+    }
+  } catch (error) {
+    console.error('Migration error:', error);
+    // If migration fails, try to rollback
+    try {
+      await run('ROLLBACK');
+    } catch (rollbackError) {
+      // Ignore rollback errors
+    }
+    // Don't throw - allow the app to continue even if migration fails
+    // The schema creation will handle new databases
+  }
+};
+
 const initializeDatabase = async () => {
   const schemaStatements = [
     'PRAGMA foreign_keys = ON',
@@ -62,8 +132,6 @@ const initializeDatabase = async () => {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       department_id INTEGER NOT NULL,
       title TEXT NOT NULL,
-      code TEXT NOT NULL UNIQUE,
-      exam_date TEXT,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE CASCADE
     )`,
@@ -156,6 +224,9 @@ const initializeDatabase = async () => {
   for (const statement of schemaStatements) {
     await run(statement);
   }
+
+  // Run migrations for existing databases
+  await migrateDatabase();
 
   const adminEmail = process.env.DEFAULT_ADMIN_EMAIL || 'admin@weems.com';
   const adminPassword = process.env.DEFAULT_ADMIN_PASSWORD || 'Admin@123';

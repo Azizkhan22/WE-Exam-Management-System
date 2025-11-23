@@ -33,7 +33,7 @@ router.get('/:id', async (req, res) => {
     if (!plan) return res.status(404).json({ message: 'Plan not found' });
 
     const semesters = await all(
-      `SELECT ps.semester_id, sem.title, sem.code
+      `SELECT ps.semester_id, sem.title
        FROM plan_semesters ps
        JOIN semesters sem ON sem.id = ps.semester_id
        WHERE ps.plan_id = ?`,

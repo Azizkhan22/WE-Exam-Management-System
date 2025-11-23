@@ -173,7 +173,7 @@ const AdminDashboard = () => {
   const [semesterCourses, setSemesterCourses] = useState([]);
   const [studentCourses, setStudentCourses] = useState([]);
   const [courseFormData, setCourseFormData] = useState({
-    semesterIds: [],
+    semesterId: '',
     examDate: '',
   });
   const [studentFormData, setStudentFormData] = useState({
@@ -279,23 +279,21 @@ const AdminDashboard = () => {
       const response = await apiClient.post(endpoint, payload);
       setFormStatus('Saved successfully');
       
-      // Handle course creation with semester relationships
-      if (endpoint === '/catalog/courses' && courseFormData.semesterIds.length > 0) {
+      // Handle course creation with semester relationship
+      if (endpoint === '/catalog/courses' && courseFormData.semesterId) {
         const courseId = response.data.id || response.data.data?.id;
         if (courseId) {
-          for (const semesterId of courseFormData.semesterIds) {
-            try {
-              await apiClient.post('/catalog/semester-courses', {
-                semesterId: Number(semesterId),
-                courseId: Number(courseId),
-                examDate: courseFormData.examDate || null,
-              });
-            } catch (err) {
-              console.error('Failed to link semester to course', err);
-            }
+          try {
+            await apiClient.post('/catalog/semester-courses', {
+              semesterId: Number(courseFormData.semesterId),
+              courseId: Number(courseId),
+              examDate: courseFormData.examDate || null,
+            });
+          } catch (err) {
+            console.error('Failed to link semester to course', err);
           }
         }
-        setCourseFormData({ semesterIds: [], examDate: '' });
+        setCourseFormData({ semesterId: '', examDate: '' });
       }
       
       // Handle student creation with course relationships
@@ -327,8 +325,8 @@ const AdminDashboard = () => {
       await apiClient.put(`${endpoint}/${id}`, payload);
       setFormStatus('Updated successfully');
       
-      // Handle course update with semester relationships
-      if (endpoint === '/catalog/courses' && courseFormData.semesterIds.length > 0) {
+      // Handle course update with semester relationship
+      if (endpoint === '/catalog/courses' && courseFormData.semesterId) {
         // First, remove existing semester-course relationships for this course
         const existingRelations = semesterCourses.filter(sc => sc.course_id === id);
         for (const rel of existingRelations) {
@@ -339,19 +337,17 @@ const AdminDashboard = () => {
           }
         }
         
-        // Then, add new relationships
-        for (const semesterId of courseFormData.semesterIds) {
-          try {
-            await apiClient.post('/catalog/semester-courses', {
-              semesterId: Number(semesterId),
-              courseId: Number(id),
-              examDate: courseFormData.examDate || null,
-            });
-          } catch (err) {
-            console.error('Failed to link semester to course', err);
-          }
+        // Then, add new relationship
+        try {
+          await apiClient.post('/catalog/semester-courses', {
+            semesterId: Number(courseFormData.semesterId),
+            courseId: Number(id),
+            examDate: courseFormData.examDate || null,
+          });
+        } catch (err) {
+          console.error('Failed to link semester to course', err);
         }
-        setCourseFormData({ semesterIds: [], examDate: '' });
+        setCourseFormData({ semesterId: '', examDate: '' });
       }
       
       // Handle student update with course relationships
@@ -591,7 +587,7 @@ const AdminDashboard = () => {
               >
                 {semesters.map((sem) => (
                   <option key={sem.id} value={sem.id}>
-                    {sem.title} ({sem.code})
+                    {sem.title}
                   </option>
                 ))}
               </Select>
@@ -804,7 +800,6 @@ const AdminDashboard = () => {
                 handleEntityUpdate('/catalog/semesters', editingSem.id, {
                   departmentId: Number(formData.get('semesterDepartment')),
                   title: formData.get('semesterTitle'),
-                  code: formData.get('semesterCode'),
                 });
                 setEditingSem(null);
                 e.currentTarget.reset();
@@ -819,7 +814,6 @@ const AdminDashboard = () => {
                 ))}
               </Select>
               <Input label="Semester title" name="semesterTitle" defaultValue={editingSem.title} required />
-              <Input label="Semester code" name="semesterCode" defaultValue={editingSem.code} required />
               <div className="flex gap-2">
                 <button type="submit" className="flex-1 py-2 rounded-2xl bg-brand-500/20 border border-brand-500/40">
                   Update
@@ -842,7 +836,6 @@ const AdminDashboard = () => {
                 handleEntityCreate('/catalog/semesters', {
                   departmentId: Number(formData.get('semesterDepartment')),
                   title: formData.get('semesterTitle'),
-                  code: formData.get('semesterCode'),
                 });
                 e.currentTarget.reset();
               }}
@@ -856,7 +849,6 @@ const AdminDashboard = () => {
                 ))}
               </Select>
               <Input label="Semester title" name="semesterTitle" placeholder="BSCS - Term V" required />
-              <Input label="Semester code" name="semesterCode" placeholder="CS-T5" required />
               <button type="submit" className="w-full py-2 rounded-2xl bg-white/10 border border-white/10">
                 Save semester
               </button>
@@ -867,7 +859,6 @@ const AdminDashboard = () => {
               <div key={sem.id} className="flex items-center justify-between p-2 rounded-xl bg-white/5">
                 <div className="flex-1 min-w-0">
                   <span className="text-sm block truncate">{sem.title}</span>
-                  <span className="text-xs text-gray-500">{sem.code}</span>
                 </div>
                 <div className="flex gap-1">
                   <button
@@ -1145,12 +1136,11 @@ const AdminDashboard = () => {
               onSubmit={async (e) => {
                 e.preventDefault();
                 const formData = new FormData(e.currentTarget);
-                const selectElement = e.target.querySelector('[name="courseSemesters"]');
-                const semesterIds = Array.from(selectElement.selectedOptions, (opt) => opt.value);
+                const semesterId = formData.get('courseSemester');
                 const examDate = formData.get('courseExamDate') || '';
                 
                 setCourseFormData({
-                  semesterIds,
+                  semesterId,
                   examDate,
                 });
                 
@@ -1165,15 +1155,22 @@ const AdminDashboard = () => {
             >
               <Input label="Course code" name="courseCode" defaultValue={editingCourse.code} required />
               <Input label="Course title" name="courseTitle" defaultValue={editingCourse.title} required />
-              <MultiSelect
-                label="Semesters (select multiple)"
-                name="courseSemesters"
-                options={semesters}
-                value={semesterCourses.filter(sc => sc.course_id === editingCourse.id).map(sc => String(sc.semester_id))}
-                onChange={(selected) => {
-                  // This will be handled by the form submission
-                }}
-              />
+              <Select 
+                label="Semester" 
+                name="courseSemester" 
+                defaultValue={(() => {
+                  const firstRelation = semesterCourses.find(sc => sc.course_id === editingCourse.id);
+                  return firstRelation?.semester_id || '';
+                })()}
+                required
+              >
+                <option value="">Select semester</option>
+                {semesters.map((sem) => (
+                  <option key={sem.id} value={sem.id}>
+                    {sem.title}
+                  </option>
+                ))}
+              </Select>
               <Input 
                 label="Exam date" 
                 name="courseExamDate" 
@@ -1191,7 +1188,7 @@ const AdminDashboard = () => {
                   type="button"
                   onClick={() => {
                     setEditingCourse(null);
-                    setCourseFormData({ semesterIds: [], examDate: '' });
+                    setCourseFormData({ semesterId: '', examDate: '' });
                   }}
                   className="px-3 py-2 rounded-2xl bg-white/10 border border-white/10"
                 >
@@ -1205,12 +1202,11 @@ const AdminDashboard = () => {
               onSubmit={async (e) => {
                 e.preventDefault();
                 const formData = new FormData(e.currentTarget);
-                const selectElement = e.target.querySelector('[name="courseSemesters"]');
-                const semesterIds = Array.from(selectElement.selectedOptions, (opt) => opt.value);
+                const semesterId = formData.get('courseSemester');
                 const examDate = formData.get('courseExamDate') || '';
                 
                 setCourseFormData({
-                  semesterIds,
+                  semesterId,
                   examDate,
                 });
                 
@@ -1220,18 +1216,25 @@ const AdminDashboard = () => {
                 });
                 
                 e.currentTarget.reset();
-                setCourseFormData({ semesterIds: [], examDate: '' });
+                setCourseFormData({ semesterId: '', examDate: '' });
               }}
             >
               <Input label="Course code" name="courseCode" placeholder="CS-301" required />
               <Input label="Course title" name="courseTitle" placeholder="Data Structures" required />
-              <MultiSelect
-                label="Semesters (select multiple)"
-                name="courseSemesters"
-                options={semesters}
-                value={courseFormData.semesterIds}
-                onChange={(selected) => setCourseFormData(prev => ({ ...prev, semesterIds: selected }))}
-              />
+              <Select 
+                label="Semester" 
+                name="courseSemester" 
+                value={courseFormData.semesterId} 
+                onChange={(e) => setCourseFormData(prev => ({ ...prev, semesterId: e.target.value }))}
+                required
+              >
+                <option value="">Select semester</option>
+                {semesters.map((sem) => (
+                  <option key={sem.id} value={sem.id}>
+                    {sem.title}
+                  </option>
+                ))}
+              </Select>
               <Input label="Exam date" name="courseExamDate" type="date" value={courseFormData.examDate} onChange={(e) => setCourseFormData(prev => ({ ...prev, examDate: e.target.value }))} />
               <button type="submit" className="w-full py-2 rounded-2xl bg-white/10 border border-white/10">
                 Save course

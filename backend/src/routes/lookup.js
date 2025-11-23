@@ -56,7 +56,7 @@ router.get('/semesters', async (_req, res) => {
       `SELECT sem.*, d.name as department_name
        FROM semesters sem
        JOIN departments d ON d.id = sem.department_id
-       ORDER BY sem.exam_date ASC`
+       ORDER BY sem.title ASC`
     );
     res.json(semesters);
   } catch (error) {
@@ -67,11 +67,12 @@ router.get('/semesters', async (_req, res) => {
 
 router.post('/semesters', authMiddleware(['admin']), async (req, res) => {
   try {
-    const { departmentId, title, code, examDate } = req.body;
+    const { departmentId, title } = req.body;
+    if (!departmentId || !title) return res.status(400).json({ message: 'Department and title are required' });
     const insert = await run(
-      `INSERT INTO semesters (department_id, title, code, exam_date)
-       VALUES (?, ?, ?, ?)`,
-      [departmentId, title, code, examDate]
+      `INSERT INTO semesters (department_id, title)
+       VALUES (?, ?)`,
+      [departmentId, title]
     );
     const semester = await get('SELECT * FROM semesters WHERE id = ?', [insert.lastID]);
     res.status(201).json(semester);
@@ -83,12 +84,13 @@ router.post('/semesters', authMiddleware(['admin']), async (req, res) => {
 
 router.put('/semesters/:id', authMiddleware(['admin']), async (req, res) => {
   try {
-    const { departmentId, title, code, examDate } = req.body;
+    const { departmentId, title } = req.body;
+    if (!departmentId || !title) return res.status(400).json({ message: 'Department and title are required' });
     await run(
       `UPDATE semesters
-       SET department_id = ?, title = ?, code = ?, exam_date = ?
+       SET department_id = ?, title = ?
        WHERE id = ?`,
-      [departmentId, title, code, examDate, req.params.id]
+      [departmentId, title, req.params.id]
     );
     const semester = await get('SELECT * FROM semesters WHERE id = ?', [req.params.id]);
     res.json(semester);

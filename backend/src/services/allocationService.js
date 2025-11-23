@@ -5,7 +5,7 @@ const fetchStudentsBySemesters = async (semesterIds = []) => {
   const placeholders = semesterIds.map(() => '?').join(',');
   // Fetch students and aggregate their enrolled course ids (if any)
   const rows = await all(
-    `SELECT s.*, sem.title as semester_title, sem.code as semester_code,
+    `SELECT s.*, sem.title as semester_title,
             d.id as department_id, d.name as department_name,
             GROUP_CONCAT(DISTINCT c.id) as course_ids
      FROM students s
@@ -15,7 +15,7 @@ const fetchStudentsBySemesters = async (semesterIds = []) => {
      LEFT JOIN courses c ON c.id = sc.course_id
      WHERE sem.id IN (${placeholders})
      GROUP BY s.id
-     ORDER BY sem.code ASC, s.roll_no ASC`,
+     ORDER BY sem.title ASC, s.roll_no ASC`,
     semesterIds
   );
 

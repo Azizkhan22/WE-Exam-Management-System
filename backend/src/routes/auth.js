@@ -122,7 +122,7 @@ router.get(
       let studentProfile = null;
       if (user.student_id) {
         studentProfile = await get(
-          `SELECT s.*, sem.title as semester_title, sem.code as semester_code, d.name as department_name
+          `SELECT s.*, sem.title as semester_title, d.name as department_name
            FROM students s
            JOIN semesters sem ON sem.id = s.semester_id
            JOIN departments d ON d.id = sem.department_id
