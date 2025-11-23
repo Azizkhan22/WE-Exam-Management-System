@@ -412,7 +412,7 @@ const AdminDashboard = () => {
         createdBy: user?.fullName || 'Admin',
         status: 'published',
         semesterIds: primaryForm.semesterIds.map(Number),
-        roomIds: [Number(primaryForm.roomId)],
+        roomId: Number(primaryForm.roomId),
       });
       setPrimaryForm((prev) => ({ ...prev, title: '' }));
       setSwapSeat(null);
@@ -543,9 +543,9 @@ const AdminDashboard = () => {
       </header>
 
       <section className="grid md:grid-cols-3 gap-6">
-        <DashboardCard label="Students" value={stats.students} icon={<FiUsers size={24} />} />
-        <DashboardCard label="Rooms" value={stats.rooms} icon={<FiGrid size={24} />} />
-        <DashboardCard label="Plans" value={stats.plans} icon={<FiLayers size={24} />} />
+        <DashboardCard label="Students" value={stats[0]} icon={<FiUsers size={24} />} />
+        <DashboardCard label="Rooms" value={stats[2]} icon={<FiGrid size={24} />} />
+        <DashboardCard label="Plans" value={stats[3]} icon={<FiLayers size={24} />} />
       </section>
 
       <section className="glass p-6 border border-white/10 space-y-6">

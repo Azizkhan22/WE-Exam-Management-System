@@ -26,25 +26,25 @@ const fetchStudentsBySemesters = async (semesterIds = []) => {
   }));
 };
 
-const computeSeatGrid = (rooms = []) => {
+const computeSeatGrid = (room = {}) => {
   const seats = [];
-  rooms.forEach((room) => {
-    const limit = Math.min(room.rows * room.cols, room.capacity || room.rows * room.cols);
-    let count = 0;
-    outer: for (let row = 1; row <= room.rows; row += 1) {
-      for (let col = 1; col <= room.cols; col += 1) {
-        seats.push({
-          roomId: room.id,
-          seatRow: row,
-          seatCol: col,
-        });
-        count += 1;
-        if (count >= limit) {
-          break outer;
-        }
+
+  const limit = Math.min(room.rows * room.cols, room.capacity || room.rows * room.cols);
+  let count = 0;
+  outer: for (let row = 1; row <= room.rows; row += 1) {
+    for (let col = 1; col <= room.cols; col += 1) {
+      seats.push({
+        roomId: room.id,
+        seatRow: row,
+        seatCol: col,
+      });
+      count += 1;
+      if (count >= limit) {
+        break outer;
       }
     }
-  });
+  }
+
   return seats;
 };
 

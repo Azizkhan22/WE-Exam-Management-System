@@ -69,36 +69,34 @@ router.get('/:id', async (req, res) => {
 });
 
 router.post('/', authMiddleware(['admin']), async (req, res) => {
-  const { title, planDate, createdBy, status = 'draft', semesterIds, roomIds } = req.body;
-  if (!title || !planDate || !createdBy || !Array.isArray(semesterIds) || !Array.isArray(roomIds)) {
+  const { title, planDate, createdBy, status = 'draft', semesterIds, roomId } = req.body;
+  if (!title || !planDate || !createdBy || !Array.isArray(semesterIds) || !roomId) {
     return res.status(400).json({ message: 'Missing plan details' });
   }
 
   try {
     const parsedDate = dayjs(planDate).format('YYYY-MM-DD');
-    if (!semesterIds.length || !roomIds.length) {
+    if (!semesterIds.length) {
       return res.status(400).json({ message: 'At least one semester and room required' });
     }
 
-    const roomPlaceholders = buildInClause(roomIds);
-    const selectedRoomsRaw = await all(
-      `SELECT * FROM rooms WHERE id IN (${roomPlaceholders}) ORDER BY name ASC`,
-      roomIds
+    const selectedRoom = await get(
+      `SELECT * FROM rooms WHERE id = ?`,
+      [roomId]
     );
 
-    const selectedRooms = selectedRoomsRaw.map((room) => ({
-      ...room,
-      id: Number(room.id),
-      capacity: Number(room.capacity),
-      rows: Number(room.rows),
-      cols: Number(room.cols),
-    }));
-
-    if (selectedRooms.length !== roomIds.length) {
+    if (!selectedRoom) {
       return res.status(400).json({ message: 'Invalid room selection' });
     }
 
-    const seatGrid = computeSeatGrid(selectedRooms);
+    const selectedRoomdData = {
+      id: Number(selectedRoom.id),
+      capacity: Number(selectedRoom.capacity),
+      rows: Number(selectedRoom.rows),
+      cols: Number(selectedRoom.cols),
+    };
+
+    const seatGrid = computeSeatGrid(selectedRoomdData);
 
     const students = await fetchStudentsBySemesters(semesterIds);
     if (!students.length) {
@@ -128,11 +126,11 @@ router.post('/', authMiddleware(['admin']), async (req, res) => {
       )
     );
 
-    await Promise.all(
-      roomIds.map((roomId) =>
-        run('INSERT INTO plan_rooms (plan_id, room_id) VALUES (?, ?)', [planId, roomId])
-      )
+    await run(
+      'INSERT INTO plan_rooms (plan_id, room_id) VALUES (?, ?)',
+      [planId, selectedRoom.id]
     );
+
 
     await Promise.all(
       assignments.map((seat) =>
@@ -150,7 +148,7 @@ router.post('/', authMiddleware(['admin']), async (req, res) => {
     res.status(201).json({ plan, seatsAllocated: assignments.length });
   } catch (error) {
     console.error('Create plan error', error);
-    await run('ROLLBACK').catch(() => {});
+    await run('ROLLBACK').catch(() => { });
     res.status(500).json({ message: 'Failed to create plan' });
   }
 });
@@ -186,7 +184,7 @@ router.post('/:id/swap', authMiddleware(['admin']), async (req, res) => {
     res.json({ message: 'Seats swapped successfully' });
   } catch (error) {
     console.error('Swap seats error', error);
-    await run('ROLLBACK').catch(() => {});
+    await run('ROLLBACK').catch(() => { });
     res.status(500).json({ message: 'Failed to swap seats' });
   }
 });
