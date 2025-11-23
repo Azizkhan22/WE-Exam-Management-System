@@ -39,6 +39,34 @@ const Select = ({ label, children, ...props }) => (
   </label>
 );
 
+const MultiSelect = ({ label, options, value = [], onChange, ...props }) => {
+  // Ensure value is always an array
+  const selectedValues = Array.isArray(value) ? value : [];
+  
+  return (
+    <label className="text-sm text-gray-400 flex flex-col gap-1">
+      {label}
+      <select
+        {...props}
+        multiple
+        value={selectedValues}
+        onChange={(e) => {
+          const selected = Array.from(e.target.selectedOptions, (option) => option.value);
+          if (onChange) onChange(selected);
+        }}
+        className="rounded-2xl bg-white/5 border border-white/10 px-4 py-3 text-white focus:border-brand-400 outline-none min-h-[100px]"
+      >
+        {options.map((option) => (
+          <option key={option.id || option.value} value={option.id || option.value}>
+            {option.label || option.title || option.name || option.code}
+          </option>
+        ))}
+      </select>
+      <p className="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple</p>
+    </label>
+  );
+};
+
 const SeatGrid = ({ room, allocations, onSeatPick, selectedSeat }) => {
   const roomId = room.room_id || room.id;
   const rows = Number(room.rows) || 0;
@@ -142,6 +170,15 @@ const AdminDashboard = () => {
   const [editingRoom, setEditingRoom] = useState(null);
   const [editingStudent, setEditingStudent] = useState(null);
   const [editingCourse, setEditingCourse] = useState(null);
+  const [semesterCourses, setSemesterCourses] = useState([]);
+  const [studentCourses, setStudentCourses] = useState([]);
+  const [courseFormData, setCourseFormData] = useState({
+    semesterIds: [],
+    examDate: '',
+  });
+  const [studentFormData, setStudentFormData] = useState({
+    courseIds: [],
+  });
   const [primaryForm, setPrimaryForm] = useState({
     title: '',
     planDate: dayjs().format('YYYY-MM-DD'),
@@ -171,7 +208,7 @@ const AdminDashboard = () => {
   const loadCoreData = async (preferredPlanId = null) => {
     setLoading(true);
     try {
-      const [deps, sems, rms, crs, studs, statsRes, plansRes] = await Promise.all([
+      const [deps, sems, rms, crs, studs, statsRes, plansRes, semCoursesRes, studCoursesRes] = await Promise.all([
         apiClient.get('/catalog/departments'),
         apiClient.get('/catalog/semesters'),
         apiClient.get('/catalog/rooms'),
@@ -179,6 +216,8 @@ const AdminDashboard = () => {
         apiClient.get('/students'),
         apiClient.get('/search/stats'),
         apiClient.get('/plans'),
+        apiClient.get('/catalog/semester-courses').catch(() => ({ data: [] })),
+        apiClient.get('/catalog/student-courses').catch(() => ({ data: [] })),
       ]);
       setDepartments(deps.data);
       setSemesters(sems.data);
@@ -187,6 +226,8 @@ const AdminDashboard = () => {
       setStudents(studs.data);
       setStats(statsRes.data);
       setPlans(plansRes.data);
+      setSemesterCourses(semCoursesRes.data || []);
+      setStudentCourses(studCoursesRes.data || []);
       if (plansRes.data.length) {
         const nextPlanId =
           preferredPlanId && plansRes.data.some((plan) => plan.id === preferredPlanId)
@@ -235,8 +276,46 @@ const AdminDashboard = () => {
 
   const handleEntityCreate = async (endpoint, payload) => {
     try {
-      await apiClient.post(endpoint, payload);
+      const response = await apiClient.post(endpoint, payload);
       setFormStatus('Saved successfully');
+      
+      // Handle course creation with semester relationships
+      if (endpoint === '/catalog/courses' && courseFormData.semesterIds.length > 0) {
+        const courseId = response.data.id || response.data.data?.id;
+        if (courseId) {
+          for (const semesterId of courseFormData.semesterIds) {
+            try {
+              await apiClient.post('/catalog/semester-courses', {
+                semesterId: Number(semesterId),
+                courseId: Number(courseId),
+                examDate: courseFormData.examDate || null,
+              });
+            } catch (err) {
+              console.error('Failed to link semester to course', err);
+            }
+          }
+        }
+        setCourseFormData({ semesterIds: [], examDate: '' });
+      }
+      
+      // Handle student creation with course relationships
+      if (endpoint === '/students' && studentFormData.courseIds.length > 0) {
+        const studentId = response.data.id || response.data.data?.id;
+        if (studentId) {
+          for (const courseId of studentFormData.courseIds) {
+            try {
+              await apiClient.post('/catalog/student-courses', {
+                studentId: Number(studentId),
+                courseId: Number(courseId),
+              });
+            } catch (err) {
+              console.error('Failed to link course to student', err);
+            }
+          }
+        }
+        setStudentFormData({ courseIds: [] });
+      }
+      
       await loadCoreData(activePlanId);
     } catch (error) {
       setFormStatus(error.response?.data?.message || 'Failed to save');
@@ -247,6 +326,60 @@ const AdminDashboard = () => {
     try {
       await apiClient.put(`${endpoint}/${id}`, payload);
       setFormStatus('Updated successfully');
+      
+      // Handle course update with semester relationships
+      if (endpoint === '/catalog/courses' && courseFormData.semesterIds.length > 0) {
+        // First, remove existing semester-course relationships for this course
+        const existingRelations = semesterCourses.filter(sc => sc.course_id === id);
+        for (const rel of existingRelations) {
+          try {
+            await apiClient.delete(`/catalog/semester-courses/${rel.semester_id}/${id}`);
+          } catch (err) {
+            console.error('Failed to remove semester-course relationship', err);
+          }
+        }
+        
+        // Then, add new relationships
+        for (const semesterId of courseFormData.semesterIds) {
+          try {
+            await apiClient.post('/catalog/semester-courses', {
+              semesterId: Number(semesterId),
+              courseId: Number(id),
+              examDate: courseFormData.examDate || null,
+            });
+          } catch (err) {
+            console.error('Failed to link semester to course', err);
+          }
+        }
+        setCourseFormData({ semesterIds: [], examDate: '' });
+      }
+      
+      // Handle student update with course relationships
+      if (endpoint === '/students' && studentFormData.courseIds.length > 0) {
+        // First, remove existing student-course relationships for this student
+        const existingRelations = studentCourses.filter(sc => sc.student_id === id);
+        for (const rel of existingRelations) {
+          try {
+            await apiClient.delete(`/catalog/student-courses/${id}/${rel.course_id}`);
+          } catch (err) {
+            console.error('Failed to remove student-course relationship', err);
+          }
+        }
+        
+        // Then, add new relationships
+        for (const courseId of studentFormData.courseIds) {
+          try {
+            await apiClient.post('/catalog/student-courses', {
+              studentId: Number(id),
+              courseId: Number(courseId),
+            });
+          } catch (err) {
+            console.error('Failed to link course to student', err);
+          }
+        }
+        setStudentFormData({ courseIds: [] });
+      }
+      
       await loadCoreData(activePlanId);
     } catch (error) {
       setFormStatus(error.response?.data?.message || 'Failed to update');
@@ -672,7 +805,6 @@ const AdminDashboard = () => {
                   departmentId: Number(formData.get('semesterDepartment')),
                   title: formData.get('semesterTitle'),
                   code: formData.get('semesterCode'),
-                  examDate: formData.get('semesterDate'),
                 });
                 setEditingSem(null);
                 e.currentTarget.reset();
@@ -688,7 +820,6 @@ const AdminDashboard = () => {
               </Select>
               <Input label="Semester title" name="semesterTitle" defaultValue={editingSem.title} required />
               <Input label="Semester code" name="semesterCode" defaultValue={editingSem.code} required />
-              <Input label="Exam date" name="semesterDate" type="date" defaultValue={editingSem.exam_date} required />
               <div className="flex gap-2">
                 <button type="submit" className="flex-1 py-2 rounded-2xl bg-brand-500/20 border border-brand-500/40">
                   Update
@@ -712,7 +843,6 @@ const AdminDashboard = () => {
                   departmentId: Number(formData.get('semesterDepartment')),
                   title: formData.get('semesterTitle'),
                   code: formData.get('semesterCode'),
-                  examDate: formData.get('semesterDate'),
                 });
                 e.currentTarget.reset();
               }}
@@ -727,7 +857,6 @@ const AdminDashboard = () => {
               </Select>
               <Input label="Semester title" name="semesterTitle" placeholder="BSCS - Term V" required />
               <Input label="Semester code" name="semesterCode" placeholder="CS-T5" required />
-              <Input label="Exam date" name="semesterDate" type="date" required />
               <button type="submit" className="w-full py-2 rounded-2xl bg-white/10 border border-white/10">
                 Save semester
               </button>
@@ -873,15 +1002,21 @@ const AdminDashboard = () => {
           {editingStudent ? (
             <form
               className="space-y-3"
-              onSubmit={(e) => {
+              onSubmit={async (e) => {
                 e.preventDefault();
                 const formData = new FormData(e.currentTarget);
-                handleEntityUpdate('/students', editingStudent.id, {
+                const selectElement = e.target.querySelector('[name="studentCourses"]');
+                const courseIds = Array.from(selectElement.selectedOptions, (opt) => opt.value);
+                
+                setStudentFormData({ courseIds });
+                
+                await handleEntityUpdate('/students', editingStudent.id, {
                   fullName: formData.get('studentName'),
                   rollNo: formData.get('studentRoll'),
                   semesterId: Number(formData.get('studentSemester')),
                   seatPref: formData.get('seatPref'),
                 });
+                
                 setEditingStudent(null);
                 e.currentTarget.reset();
               }}
@@ -896,6 +1031,15 @@ const AdminDashboard = () => {
                   </option>
                 ))}
               </Select>
+              <MultiSelect
+                label="Courses (select multiple)"
+                name="studentCourses"
+                options={courses}
+                value={studentCourses.filter(sc => sc.student_id === editingStudent.id).map(sc => String(sc.course_id))}
+                onChange={(selected) => {
+                  // This will be handled by the form submission
+                }}
+              />
               <Input label="Seat preference" name="seatPref" defaultValue={editingStudent.seat_pref || ''} />
               <div className="flex gap-2">
                 <button type="submit" className="flex-1 py-2 rounded-2xl bg-brand-500/20 border border-brand-500/40">
@@ -903,7 +1047,10 @@ const AdminDashboard = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setEditingStudent(null)}
+                  onClick={() => {
+                    setEditingStudent(null);
+                    setStudentFormData({ courseIds: [] });
+                  }}
                   className="px-3 py-2 rounded-2xl bg-white/10 border border-white/10"
                 >
                   <FiX />
@@ -913,16 +1060,23 @@ const AdminDashboard = () => {
           ) : (
             <form
               className="space-y-3"
-              onSubmit={(e) => {
+              onSubmit={async (e) => {
                 e.preventDefault();
                 const formData = new FormData(e.currentTarget);
-                handleEntityCreate('/students', {
+                const selectElement = e.target.querySelector('[name="studentCourses"]');
+                const courseIds = Array.from(selectElement.selectedOptions, (opt) => opt.value);
+                
+                setStudentFormData({ courseIds });
+                
+                await handleEntityCreate('/students', {
                   fullName: formData.get('studentName'),
                   rollNo: formData.get('studentRoll'),
                   semesterId: Number(formData.get('studentSemester')),
                   seatPref: formData.get('seatPref'),
                 });
+                
                 e.currentTarget.reset();
+                setStudentFormData({ courseIds: [] });
               }}
             >
               <Input label="Full name" name="studentName" placeholder="Areeba Khan" required />
@@ -935,6 +1089,13 @@ const AdminDashboard = () => {
                   </option>
                 ))}
               </Select>
+              <MultiSelect
+                label="Courses (select multiple)"
+                name="studentCourses"
+                options={courses}
+                value={studentFormData.courseIds}
+                onChange={(selected) => setStudentFormData(prev => ({ ...prev, courseIds: selected }))}
+              />
               <Input label="Seat preference" name="seatPref" placeholder="Optional note" />
               <button type="submit" className="w-full py-2 rounded-2xl bg-white/10 border border-white/10">
                 Save student
@@ -981,26 +1142,57 @@ const AdminDashboard = () => {
           {editingCourse ? (
             <form
               className="space-y-3"
-              onSubmit={(e) => {
+              onSubmit={async (e) => {
                 e.preventDefault();
                 const formData = new FormData(e.currentTarget);
-                handleEntityUpdate('/catalog/courses', editingCourse.id, {
+                const selectElement = e.target.querySelector('[name="courseSemesters"]');
+                const semesterIds = Array.from(selectElement.selectedOptions, (opt) => opt.value);
+                const examDate = formData.get('courseExamDate') || '';
+                
+                setCourseFormData({
+                  semesterIds,
+                  examDate,
+                });
+                
+                await handleEntityUpdate('/catalog/courses', editingCourse.id, {
                   code: formData.get('courseCode'),
                   title: formData.get('courseTitle'),
                 });
+                
                 setEditingCourse(null);
                 e.currentTarget.reset();
               }}
             >
               <Input label="Course code" name="courseCode" defaultValue={editingCourse.code} required />
               <Input label="Course title" name="courseTitle" defaultValue={editingCourse.title} required />
+              <MultiSelect
+                label="Semesters (select multiple)"
+                name="courseSemesters"
+                options={semesters}
+                value={semesterCourses.filter(sc => sc.course_id === editingCourse.id).map(sc => String(sc.semester_id))}
+                onChange={(selected) => {
+                  // This will be handled by the form submission
+                }}
+              />
+              <Input 
+                label="Exam date" 
+                name="courseExamDate" 
+                type="date" 
+                defaultValue={(() => {
+                  const firstRelation = semesterCourses.find(sc => sc.course_id === editingCourse.id);
+                  return firstRelation?.exam_date || '';
+                })()}
+              />
               <div className="flex gap-2">
                 <button type="submit" className="flex-1 py-2 rounded-2xl bg-brand-500/20 border border-brand-500/40">
                   Update
                 </button>
                 <button
                   type="button"
-                  onClick={() => setEditingCourse(null)}
+                  onClick={() => {
+                    setEditingCourse(null);
+                    setCourseFormData({ semesterIds: [], examDate: '' });
+                  }}
                   className="px-3 py-2 rounded-2xl bg-white/10 border border-white/10"
                 >
                   <FiX />
@@ -1010,18 +1202,37 @@ const AdminDashboard = () => {
           ) : (
             <form
               className="space-y-3"
-              onSubmit={(e) => {
+              onSubmit={async (e) => {
                 e.preventDefault();
                 const formData = new FormData(e.currentTarget);
-                handleEntityCreate('/catalog/courses', {
+                const selectElement = e.target.querySelector('[name="courseSemesters"]');
+                const semesterIds = Array.from(selectElement.selectedOptions, (opt) => opt.value);
+                const examDate = formData.get('courseExamDate') || '';
+                
+                setCourseFormData({
+                  semesterIds,
+                  examDate,
+                });
+                
+                await handleEntityCreate('/catalog/courses', {
                   code: formData.get('courseCode'),
                   title: formData.get('courseTitle'),
                 });
+                
                 e.currentTarget.reset();
+                setCourseFormData({ semesterIds: [], examDate: '' });
               }}
             >
               <Input label="Course code" name="courseCode" placeholder="CS-301" required />
               <Input label="Course title" name="courseTitle" placeholder="Data Structures" required />
+              <MultiSelect
+                label="Semesters (select multiple)"
+                name="courseSemesters"
+                options={semesters}
+                value={courseFormData.semesterIds}
+                onChange={(selected) => setCourseFormData(prev => ({ ...prev, semesterIds: selected }))}
+              />
+              <Input label="Exam date" name="courseExamDate" type="date" value={courseFormData.examDate} onChange={(e) => setCourseFormData(prev => ({ ...prev, examDate: e.target.value }))} />
               <button type="submit" className="w-full py-2 rounded-2xl bg-white/10 border border-white/10">
                 Save course
               </button>

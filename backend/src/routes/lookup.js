@@ -218,7 +218,7 @@ router.delete('/courses/:id', authMiddleware(['admin']), async (req, res) => {
 router.get('/semester-courses', async (_req, res) => {
   try {
     const rows = await all(
-      `SELECT sc.semester_id, sc.course_id, sem.title as semester_title, c.code as course_code, c.title as course_title
+      `SELECT sc.semester_id, sc.course_id, sc.exam_date, sem.title as semester_title, c.code as course_code, c.title as course_title
        FROM semester_courses sc
        JOIN semesters sem ON sem.id = sc.semester_id
        JOIN courses c ON c.id = sc.course_id
@@ -233,10 +233,10 @@ router.get('/semester-courses', async (_req, res) => {
 
 router.post('/semester-courses', authMiddleware(['admin']), async (req, res) => {
   try {
-    const { semesterId, courseId } = req.body;
+    const { semesterId, courseId, examDate } = req.body;
     if (!semesterId || !courseId) return res.status(400).json({ message: 'semesterId and courseId required' });
-    await run('INSERT INTO semester_courses (semester_id, course_id) VALUES (?, ?)', [semesterId, courseId]);
-    res.status(201).json({ semesterId, courseId });
+    await run('INSERT INTO semester_courses (semester_id, course_id, exam_date) VALUES (?, ?, ?)', [semesterId, courseId, examDate || null]);
+    res.status(201).json({ semesterId, courseId, examDate: examDate || null });
   } catch (error) {
     console.error('Create semester-course mapping error', error);
     res.status(500).json({ message: 'Failed to create semester-course mapping' });

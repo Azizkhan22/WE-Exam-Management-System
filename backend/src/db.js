@@ -76,6 +76,7 @@ const initializeDatabase = async () => {
     `CREATE TABLE IF NOT EXISTS semester_courses (
       semester_id INTEGER NOT NULL,
       course_id INTEGER NOT NULL,
+      exam_date TEXT,
       PRIMARY KEY (semester_id, course_id),
       FOREIGN KEY (semester_id) REFERENCES semesters(id) ON DELETE CASCADE,
       FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
