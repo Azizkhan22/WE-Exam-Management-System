@@ -12,17 +12,22 @@ router.get(
       const { search = '', semesterId } = req.query;
       const clauses = [];
       const params = [];
+
       if (search) {
         clauses.push('(s.full_name LIKE ? OR s.roll_no LIKE ?)');
         params.push(`%${search}%`, `%${search}%`);
       }
+
       if (semesterId) {
         clauses.push('s.semester_id = ?');
         params.push(semesterId);
       }
+
       const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+
+      // Fetch students with semester and department info
       const students = await all(
-        `SELECT s.*, sem.title as semester_title, d.name as department_name
+        `SELECT s.*, sem.title AS semester_title, d.name AS department_name
          FROM students s
          JOIN semesters sem ON sem.id = s.semester_id
          JOIN departments d ON d.id = sem.department_id
@@ -30,7 +35,33 @@ router.get(
          ORDER BY s.roll_no ASC`,
         params
       );
-      res.json(students);
+
+      if (students.length === 0) {
+        return res.json([]);
+      }
+
+      // Fetch all student_courses for these students
+      const studentIds = students.map(s => s.id);
+      const placeholders = studentIds.map(() => '?').join(',');
+      const studentCourses = await all(
+        `SELECT student_id, course_id
+         FROM student_courses
+         WHERE student_id IN (${placeholders})`,
+        studentIds
+      );
+
+      // Map courseIds to each student
+      const studentsWithCourses = students.map(student => {
+        const courses = studentCourses
+          .filter(sc => sc.student_id === student.id)
+          .map(sc => sc.course_id);
+
+        return {
+          ...student,
+          courseIds: courses
+        };
+      });      
+      res.json(studentsWithCourses);
     } catch (error) {
       console.error('List students error', error);
       res.status(500).json({ message: 'Failed to fetch students' });
@@ -38,19 +69,42 @@ router.get(
   }
 );
 
+
 router.post(
   '/',
   authMiddleware(['admin']),
   async (req, res) => {
     try {
-      const { fullName, rollNo, semesterId, seatPref } = req.body;
+      const { fullName, rollNo, semesterId, seatPref, courseIds = [] } = req.body;
+
       const insert = await run(
         `INSERT INTO students (semester_id, roll_no, full_name, seat_pref)
          VALUES (?, ?, ?, ?)`,
         [semesterId, rollNo, fullName, seatPref || null]
       );
-      const student = await get('SELECT * FROM students WHERE id = ?', [insert.lastID]);
-      res.status(201).json(student);
+
+      const studentId = insert.lastID;
+
+      if (Array.isArray(courseIds) && courseIds.length > 0) {
+        await Promise.all(
+          courseIds.map((courseId) =>
+            run(
+              `INSERT INTO student_courses (student_id, course_id)
+               VALUES (?, ?)`,
+              [studentId, courseId]
+            )
+          )
+        );
+      }
+
+      const newStudent = await get('SELECT * FROM students WHERE id = ?', [studentId]);
+      const student = {
+        ...newStudent,
+        courseIds: courseIds,
+      };
+      res.status(201).json({
+        ...student
+      });
     } catch (error) {
       console.error('Create student error', error);
       res.status(500).json({ message: 'Failed to create student' });

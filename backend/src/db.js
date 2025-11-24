@@ -139,13 +139,13 @@ const initializeDatabase = async () => {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       code TEXT NOT NULL UNIQUE,
       title TEXT NOT NULL,
+      exam_date TEXT,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )`,
     `CREATE TABLE IF NOT EXISTS semester_courses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
       semester_id INTEGER NOT NULL,
-      course_id INTEGER NOT NULL,
-      exam_date TEXT,
-      PRIMARY KEY (semester_id, course_id),
+      course_id INTEGER NOT NULL,            
       FOREIGN KEY (semester_id) REFERENCES semesters(id) ON DELETE CASCADE,
       FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
     )`,
@@ -159,9 +159,9 @@ const initializeDatabase = async () => {
       FOREIGN KEY (semester_id) REFERENCES semesters(id) ON DELETE CASCADE
     )`,
     `CREATE TABLE IF NOT EXISTS student_courses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
       student_id INTEGER NOT NULL,
-      course_id INTEGER NOT NULL,
-      PRIMARY KEY (student_id, course_id),
+      course_id INTEGER NOT NULL,      
       FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
       FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
     )`,

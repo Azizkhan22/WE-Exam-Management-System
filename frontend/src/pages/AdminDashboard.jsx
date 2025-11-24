@@ -275,50 +275,38 @@ const AdminDashboard = () => {
   };
 
   const handleEntityCreate = async (endpoint, payload) => {
-    try {
-      const response = await apiClient.post(endpoint, payload);
-      setFormStatus('Saved successfully');
-      
-      // Handle course creation with semester relationship
-      if (endpoint === '/catalog/courses' && courseFormData.semesterId) {
-        const courseId = response.data.id || response.data.data?.id;
-        if (courseId) {
-          try {
-            await apiClient.post('/catalog/semester-courses', {
-              semesterId: Number(courseFormData.semesterId),
-              courseId: Number(courseId),
-              examDate: courseFormData.examDate || null,
-            });
-          } catch (err) {
-            console.error('Failed to link semester to course', err);
-          }
-        }
-        setCourseFormData({ semesterId: '', examDate: '' });
-      }
-      
-      // Handle student creation with course relationships
-      if (endpoint === '/students' && studentFormData.courseIds.length > 0) {
-        const studentId = response.data.id || response.data.data?.id;
-        if (studentId) {
-          for (const courseId of studentFormData.courseIds) {
-            try {
-              await apiClient.post('/catalog/student-courses', {
-                studentId: Number(studentId),
-                courseId: Number(courseId),
-              });
-            } catch (err) {
-              console.error('Failed to link course to student', err);
-            }
-          }
-        }
-        setStudentFormData({ courseIds: [] });
-      }
-      
-      await loadCoreData(activePlanId);
-    } catch (error) {
-      setFormStatus(error.response?.data?.message || 'Failed to save');
+  try {
+    const response = await apiClient.post(endpoint, payload);
+    const newEntity = response.data; 
+    
+    setFormStatus('Saved successfully');
+
+    if (endpoint.includes('/catalog/departments')) {
+      setDepartments(prev => [...prev, newEntity]);
     }
-  };
+
+    else if (endpoint.includes('/catalog/semesters')) {
+      setSemesters(prev => [...prev, newEntity]);
+    }
+
+    else if (endpoint.includes('/catalog/rooms')) {
+      setRooms(prev => [...prev, newEntity]);
+    }
+
+    else if (endpoint.includes('/catalog/courses')) {
+      setCourses(prev => [...prev, newEntity]);
+    }
+
+    else if (endpoint.includes('/students')) {
+      console.log(newEntity);
+      setStudents(prev => [...prev, newEntity]);
+    }
+
+  } catch (error) {
+    setFormStatus(error.response?.data?.message || 'Failed to save');
+  }
+};
+
 
   const handleEntityUpdate = async (endpoint, id, payload) => {
     try {
@@ -1064,10 +1052,10 @@ const AdminDashboard = () => {
                   rollNo: formData.get('studentRoll'),
                   semesterId: Number(formData.get('studentSemester')),
                   seatPref: formData.get('seatPref'),
+                  courseIds: courseIds,
                 });
                 
-                e.currentTarget.reset();
-                setStudentFormData({ courseIds: [] });
+                e.currentTarget.reset();                
               }}
             >
               <Input label="Full name" name="studentName" placeholder="Areeba Khan" required />
