@@ -15,7 +15,7 @@ router.get('/departments', async (_req, res) => {
   }
 });
 
-router.post('/departments', authMiddleware(['admin']), async (req, res) => {
+router.post('/departments', authMiddleware(), async (req, res) => {
   try {
     const { name } = req.body;
     if (!name) return res.status(400).json({ message: 'Name is required' });
@@ -28,7 +28,7 @@ router.post('/departments', authMiddleware(['admin']), async (req, res) => {
   }
 });
 
-router.put('/departments/:id', authMiddleware(['admin']), async (req, res) => {
+router.put('/departments/:id', authMiddleware(), async (req, res) => {
   try {
     await run('UPDATE departments SET name = ? WHERE id = ?', [req.body.name, req.params.id]);
     const department = await get('SELECT * FROM departments WHERE id = ?', [req.params.id]);
@@ -39,7 +39,7 @@ router.put('/departments/:id', authMiddleware(['admin']), async (req, res) => {
   }
 });
 
-router.delete('/departments/:id', authMiddleware(['admin']), async (req, res) => {
+router.delete('/departments/:id', authMiddleware(), async (req, res) => {
   try {
     await run('DELETE FROM departments WHERE id = ?', [req.params.id]);
     res.status(204).end();
@@ -65,7 +65,7 @@ router.get('/semesters', async (_req, res) => {
   }
 });
 
-router.post('/semesters', authMiddleware(['admin']), async (req, res) => {
+router.post('/semesters', authMiddleware(), async (req, res) => {
   try {
     const { departmentId, title } = req.body;
     if (!departmentId || !title) return res.status(400).json({ message: 'Department and title are required' });
@@ -82,7 +82,7 @@ router.post('/semesters', authMiddleware(['admin']), async (req, res) => {
   }
 });
 
-router.put('/semesters/:id', authMiddleware(['admin']), async (req, res) => {
+router.put('/semesters/:id', authMiddleware(), async (req, res) => {
   try {
     const { departmentId, title } = req.body;
     if (!departmentId || !title) return res.status(400).json({ message: 'Department and title are required' });
@@ -100,7 +100,7 @@ router.put('/semesters/:id', authMiddleware(['admin']), async (req, res) => {
   }
 });
 
-router.delete('/semesters/:id', authMiddleware(['admin']), async (req, res) => {
+router.delete('/semesters/:id', authMiddleware(), async (req, res) => {
   try {
     await run('DELETE FROM semesters WHERE id = ?', [req.params.id]);
     res.status(204).end();
@@ -121,7 +121,7 @@ router.get('/rooms', async (_req, res) => {
   }
 });
 
-router.post('/rooms', authMiddleware(['admin']), async (req, res) => {
+router.post('/rooms', authMiddleware(), async (req, res) => {
   try {
     const { code, name, capacity, rows, cols, invigilatorName } = req.body;
     if (rows * cols < capacity) {
@@ -140,7 +140,7 @@ router.post('/rooms', authMiddleware(['admin']), async (req, res) => {
   }
 });
 
-router.put('/rooms/:id', authMiddleware(['admin']), async (req, res) => {
+router.put('/rooms/:id', authMiddleware(), async (req, res) => {
   try {
     const { code, name, capacity, rows, cols, invigilatorName } = req.body;
     if (rows * cols < capacity) {
@@ -160,7 +160,7 @@ router.put('/rooms/:id', authMiddleware(['admin']), async (req, res) => {
   }
 });
 
-router.delete('/rooms/:id', authMiddleware(['admin']), async (req, res) => {
+router.delete('/rooms/:id', authMiddleware(), async (req, res) => {
   try {
     await run('DELETE FROM rooms WHERE id = ?', [req.params.id]);
     res.status(204).end();
@@ -181,7 +181,7 @@ router.get('/courses', async (_req, res) => {
   }
 });
 
-router.post('/courses', authMiddleware(['admin']), async (req, res) => {
+router.post('/courses', authMiddleware(), async (req, res) => {
   try {
     const { code, title } = req.body;
     if (!code || !title) return res.status(400).json({ message: 'Code and title are required' });
@@ -206,7 +206,7 @@ router.put('/courses/:id', authMiddleware(['admin']), async (req, res) => {
   }
 });
 
-router.delete('/courses/:id', authMiddleware(['admin']), async (req, res) => {
+router.delete('/courses/:id', authMiddleware(), async (req, res) => {
   try {
     await run('DELETE FROM courses WHERE id = ?', [req.params.id]);
     res.status(204).end();
@@ -233,7 +233,7 @@ router.get('/semester-courses', async (_req, res) => {
   }
 });
 
-router.post('/semester-courses', authMiddleware(['admin']), async (req, res) => {
+router.post('/semester-courses', authMiddleware(), async (req, res) => {
   try {
     const { semesterId, courseId, examDate } = req.body;
     if (!semesterId || !courseId) return res.status(400).json({ message: 'semesterId and courseId required' });
@@ -245,7 +245,7 @@ router.post('/semester-courses', authMiddleware(['admin']), async (req, res) => 
   }
 });
 
-router.delete('/semester-courses/:semesterId/:courseId', authMiddleware(['admin']), async (req, res) => {
+router.delete('/semester-courses/:semesterId/:courseId', authMiddleware(), async (req, res) => {
   try {
     const { semesterId, courseId } = req.params;
     await run('DELETE FROM semester_courses WHERE semester_id = ? AND course_id = ?', [semesterId, courseId]);
@@ -283,7 +283,7 @@ router.get('/student-courses', async (req, res) => {
   }
 });
 
-router.post('/student-courses', authMiddleware(['admin']), async (req, res) => {
+router.post('/student-courses', authMiddleware(), async (req, res) => {
   try {
     const { studentId, courseId } = req.body;
     if (!studentId || !courseId) return res.status(400).json({ message: 'studentId and courseId required' });
@@ -295,7 +295,7 @@ router.post('/student-courses', authMiddleware(['admin']), async (req, res) => {
   }
 });
 
-router.delete('/student-courses/:studentId/:courseId', authMiddleware(['admin']), async (req, res) => {
+router.delete('/student-courses/:studentId/:courseId', authMiddleware(), async (req, res) => {
   try {
     const { studentId, courseId } = req.params;
     await run('DELETE FROM student_courses WHERE student_id = ? AND course_id = ?', [studentId, courseId]);

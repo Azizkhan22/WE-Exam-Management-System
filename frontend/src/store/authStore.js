@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import apiClient, { setAuthToken } from '../services/api';
 
-const persistedToken = localStorage.getItem('weems_token');
+const persistedToken = localStorage.getItem('auth_token');
 if (persistedToken) {
   setAuthToken(persistedToken);
 }
@@ -23,7 +23,7 @@ export const useAuthStore = create((set, get) => ({
     } catch (error) {
       console.error('Failed to bootstrap auth', error);
       setAuthToken(null);
-      localStorage.removeItem('weems_token');
+      localStorage.removeItem('auth_token');
       set({ user: null, token: null, initializing: false });
     }
   },
@@ -31,14 +31,14 @@ export const useAuthStore = create((set, get) => ({
   login: async (credentials) => {
     const { data } = await apiClient.post('/auth/login', credentials);
     setAuthToken(data.token);
-    localStorage.setItem('weems_token', data.token);
+    localStorage.setItem('auth_token', data.token);
     set({ user: data.user, token: data.token });
     return data.user;
   },
 
   logout: () => {
     setAuthToken(null);
-    localStorage.removeItem('weems_token');
+    localStorage.removeItem('auth_token');
     set({ user: null, token: null });
   },
 }));

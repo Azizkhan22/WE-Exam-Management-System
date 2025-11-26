@@ -224,7 +224,8 @@ const AdminDashboard = () => {
       setRooms(rms.data);
       setCourses(crs.data);
       setStudents(studs.data);
-      setStats(statsRes.data);
+      const statsArray = Object.values(statsRes.data);
+      setStats(statsArray);
       setPlans(plansRes.data);
       setSemesterCourses(semCoursesRes.data || []);
       setStudentCourses(studCoursesRes.data || []);

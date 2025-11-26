@@ -95,15 +95,12 @@ const LandingPage = () => {
               Continue
             </Link>
           ) : (
-            <>
-              <Link to="/auth" className="text-sm text-gray-300 hover:text-white transition">
-                Login
-              </Link>
+            <>              
               <Link
                 to="/auth"
                 className="px-4 py-2 rounded-xl bg-gradient-to-r from-brand-500 to-accent shadow-glass"
               >
-                Get started
+                Login
               </Link>
             </>
           )}
@@ -187,7 +184,7 @@ const LandingPage = () => {
       <section id="features" className="px-6 md:px-12 py-16 md:py-24 space-y-10">
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.5em] text-gray-400">WHY WEEMS</p>
+            <p className="text-xs uppercase tracking-[0.5em] text-gray-400">WHY KAEMS</p>
             <h2 className="text-3xl md:text-4xl font-display mt-2">A playground for exam admins</h2>
           </div>
           <div className="text-gray-300 max-w-xl">

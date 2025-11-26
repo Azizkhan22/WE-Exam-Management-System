@@ -5,8 +5,7 @@ import apiClient from '../services/api';
 import { useAuthStore } from '../store/authStore';
 
 const AuthPage = () => {
-  const navigate = useNavigate();  
-  const [mode, setMode] = useState('login');
+  const navigate = useNavigate();
   const [semesters, setSemesters] = useState([]);
   const [status, setStatus] = useState({ type: '', message: '' });
   const [loading, setLoading] = useState(false);
@@ -33,19 +32,19 @@ const AuthPage = () => {
     e.preventDefault();
     setLoading(true);
     setStatus({ type: '', message: '' });
-  
+
     try {
       const loggedUser = await login(loginFields);
-  
+
       setStatus({
         type: 'success',
         message: `Welcome back ${loggedUser.fullName}`,
       });
-  
+
       setTimeout(() => {
-        navigate(loggedUser.role === 'admin' ? '/dashboard' : '/student-seat');
-      }, 500);
-  
+        navigate('/dashboard');
+      }, 800);
+
     } catch (error) {
       setStatus({
         type: 'error',
@@ -53,7 +52,7 @@ const AuthPage = () => {
           error.response?.data?.message ||
           'Unable to log in. Check credentials.',
       });
-  
+
     } finally {
       setLoading(false);
     }
@@ -69,147 +68,52 @@ const AuthPage = () => {
             <p className="text-gray-400 mt-2">
               Access the immersive dashboard, CRUD suite, allocation engine, and analytics.
             </p>
-          </div>         
+          </div>
 
           {status.message && (
             <div
               className={`rounded-xl px-4 py-3 text-sm ${status.type === 'success'
-                  ? 'bg-emerald-500/10 border border-emerald-500/40 text-emerald-200'
-                  : 'bg-rose-500/10 border border-rose-500/40 text-rose-200'
+                ? 'bg-emerald-500/10 border border-emerald-500/40 text-emerald-200'
+                : 'bg-rose-500/10 border border-rose-500/40 text-rose-200'
                 }`}
             >
               {status.message}
             </div>
           )}
-
-          {mode === 'login' ? (
-            <form className="space-y-4" onSubmit={handleLogin}>
-              <div>
-                <label className="text-sm text-gray-400">Email</label>
-                <input
-                  type="email"
-                  className="mt-1 w-full rounded-2xl bg-white/5 border border-white/10 px-4 py-3 focus:border-brand-400 outline-none"
-                  value={loginFields.email}
-                  onChange={(e) => setLoginFields((prev) => ({ ...prev, email: e.target.value }))}
-                  required
-                />
-              </div>
-              <div>
-                <label className="text-sm text-gray-400">Password</label>
-                <input
-                  type="password"
-                  className="mt-1 w-full rounded-2xl bg-white/5 border border-white/10 px-4 py-3 focus:border-brand-400 outline-none"
-                  value={loginFields.password}
-                  onChange={(e) =>
-                    setLoginFields((prev) => ({ ...prev, password: e.target.value }))
-                  }
-                  required
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3 rounded-2xl bg-gradient-to-r from-brand-500 to-accent font-medium disabled:opacity-50"
-              >
-                {loading ? 'Authenticating...' : 'Enter dashboard'}
-              </button>
-              <p className="text-xs text-gray-500">
-                Default admin: admin@weems.com / Admin@123 (update via .env)
-              </p>
-            </form>
-          ) : (
-            <form className="space-y-4" onSubmit={handleRegister}>
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm text-gray-400">Full name</label>
-                  <input
-                    type="text"
-                    className="mt-1 w-full rounded-2xl bg-white/5 border border-white/10 px-4 py-3 focus:border-brand-400 outline-none"
-                    value={registerFields.fullName}
-                    onChange={(e) =>
-                      setRegisterFields((prev) => ({ ...prev, fullName: e.target.value }))
-                    }
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="text-sm text-gray-400">Roll number</label>
-                  <input
-                    type="text"
-                    className="mt-1 w-full rounded-2xl bg-white/5 border border-white/10 px-4 py-3 focus:border-brand-400 outline-none"
-                    value={registerFields.rollNo}
-                    onChange={(e) =>
-                      setRegisterFields((prev) => ({ ...prev, rollNo: e.target.value }))
-                    }
-                    required
-                  />
-                </div>
-              </div>
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm text-gray-400">Email</label>
-                  <input
-                    type="email"
-                    className="mt-1 w-full rounded-2xl bg-white/5 border border-white/10 px-4 py-3 focus:border-brand-400 outline-none"
-                    value={registerFields.email}
-                    onChange={(e) =>
-                      setRegisterFields((prev) => ({ ...prev, email: e.target.value }))
-                    }
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="text-sm text-gray-400">Password</label>
-                  <input
-                    type="password"
-                    className="mt-1 w-full rounded-2xl bg-white/5 border border-white/10 px-4 py-3 focus:border-brand-400 outline-none"
-                    value={registerFields.password}
-                    onChange={(e) =>
-                      setRegisterFields((prev) => ({ ...prev, password: e.target.value }))
-                    }
-                    required
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="text-sm text-gray-400">Semester</label>
-                <select
-                  className="mt-1 w-full rounded-2xl bg-white/5 border border-white/10 px-4 py-3 focus:border-brand-400 outline-none"
-                  value={registerFields.semesterId}
-                  onChange={(e) =>
-                    setRegisterFields((prev) => ({ ...prev, semesterId: e.target.value }))
-                  }
-                  required
-                >
-                  <option value="">Select semester</option>
-                  {sortedSemesters.map((sem) => (
-                    <option key={sem.id} value={sem.id}>
-                      {sem.title}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-sm text-gray-400">Seat preference (optional)</label>
-                <input
-                  type="text"
-                  className="mt-1 w-full rounded-2xl bg-white/5 border border-white/10 px-4 py-3 focus:border-brand-400 outline-none"
-                  value={registerFields.seatPref}
-                  onChange={(e) =>
-                    setRegisterFields((prev) => ({ ...prev, seatPref: e.target.value }))
-                  }
-                  placeholder="Near aisle, front row, etc."
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3 rounded-2xl bg-gradient-to-r from-brand-500 to-accent font-medium disabled:opacity-50"
-              >
-                {loading ? 'Creating profile...' : 'Register & view seat'}
-              </button>
-            </form>
-          )}
+          <form className="space-y-4" onSubmit={handleLogin}>
+            <div>
+              <label className="text-sm text-gray-400">Email</label>
+              <input
+                type="email"
+                className="mt-1 w-full rounded-2xl bg-white/5 border border-white/10 px-4 py-3 focus:border-brand-400 outline-none"
+                value={loginFields.email}
+                onChange={(e) => setLoginFields((prev) => ({ ...prev, email: e.target.value }))}
+                required
+              />
+            </div>
+            <div>
+              <label className="text-sm text-gray-400">Password</label>
+              <input
+                type="password"
+                className="mt-1 w-full rounded-2xl bg-white/5 border border-white/10 px-4 py-3 focus:border-brand-400 outline-none"
+                value={loginFields.password}
+                onChange={(e) =>
+                  setLoginFields((prev) => ({ ...prev, password: e.target.value }))
+                }
+                required
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 rounded-2xl bg-gradient-to-r from-brand-500 to-accent font-medium disabled:opacity-50"
+            >
+              {loading ? 'Authenticating...' : 'Enter dashboard'}
+            </button>
+            <p className="text-xs text-gray-500">
+              In case of forgotten credentials, please contact your Tech admin.
+            </p>
+          </form>
         </div>
 
         <div className="glass p-8 border border-white/10 space-y-6">

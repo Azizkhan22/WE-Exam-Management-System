@@ -12,7 +12,7 @@ const router = express.Router();
 
 const buildInClause = (items = []) => items.map(() => '?').join(',');
 
-router.get('/', authMiddleware(['admin']), async (_req, res) => {
+router.get('/', authMiddleware(), async (_req, res) => {
   try {
     const plans = await all(
       `SELECT sp.*,
@@ -68,7 +68,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.post('/', authMiddleware(['admin']), async (req, res) => {
+router.post('/', authMiddleware(), async (req, res) => {
   const { title, planDate, createdBy, status = 'draft', semesterIds, roomId } = req.body;
   if (!title || !planDate || !createdBy || !Array.isArray(semesterIds) || !roomId) {
     return res.status(400).json({ message: 'Missing plan details' });
@@ -153,7 +153,7 @@ router.post('/', authMiddleware(['admin']), async (req, res) => {
   }
 });
 
-router.post('/:id/swap', authMiddleware(['admin']), async (req, res) => {
+router.post('/:id/swap', authMiddleware(), async (req, res) => {
   const { seatA, seatB } = req.body;
   if (!seatA || !seatB) return res.status(400).json({ message: 'Both seats required' });
 
@@ -189,7 +189,7 @@ router.post('/:id/swap', authMiddleware(['admin']), async (req, res) => {
   }
 });
 
-router.get('/:id/export', authMiddleware(['admin']), async (req, res) => {
+router.get('/:id/export', authMiddleware(), async (req, res) => {
   try {
     const allocations = await all(
       `SELECT a.*, s.full_name, s.roll_no, sem.title as semester_title,

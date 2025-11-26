@@ -1,7 +1,7 @@
 import { Navigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 
-const ProtectedRoute = ({ children, roles = [] }) => {
+const ProtectedRoute = ({ children }) => {
   const { user, token, initializing } = useAuthStore();
 
   if (initializing) {
@@ -17,11 +17,6 @@ const ProtectedRoute = ({ children, roles = [] }) => {
   if (!token) {
     return <Navigate to="/auth" replace />;
   }
-
-  if (roles.length && (!user || !roles.includes(user.role))) {
-    return <Navigate to="/" replace />;
-  }
-
   return children;
 };
 

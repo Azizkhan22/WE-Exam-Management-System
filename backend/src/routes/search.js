@@ -13,7 +13,7 @@ router.get('/stats', async (_req, res) => {
       get('SELECT COUNT(*) as total FROM seating_plans'),
     ]);
     res.json({
-      'Seats arranged': students.total,
+      'Seats arranged': students.total, 
       'Departements onboarded': departments.total,
       'Exam rooms optimized': rooms.total,
       'Seating plan generated': plans.total,
@@ -24,7 +24,7 @@ router.get('/stats', async (_req, res) => {
   }
 });
 
-router.get('/students', authMiddleware(['admin']), async (req, res) => {
+router.get('/students', authMiddleware(), async (req, res) => {
   try {
     const { q = '' } = req.query;
     const students = await all(
@@ -42,7 +42,7 @@ router.get('/students', authMiddleware(['admin']), async (req, res) => {
   }
 });
 
-router.get('/rooms', authMiddleware(['admin']), async (req, res) => {
+router.get('/rooms', authMiddleware(), async (req, res) => {
   try {
     const { q = '' } = req.query;
     const rooms = await all(
