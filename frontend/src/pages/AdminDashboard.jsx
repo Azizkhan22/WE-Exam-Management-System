@@ -4,6 +4,7 @@ import dayjs from 'dayjs';
 import jsPDF from 'jspdf';
 import apiClient from '../services/api';
 import { useAuthStore } from '../store/authStore';
+import StatusMessage from '../components/StatusMessage'
 
 const DashboardCard = ({ label, value, icon }) => (
   <div className="glass p-6 border border-white/10 flex items-center gap-4">
@@ -195,6 +196,12 @@ const AdminDashboard = () => {
     [planDetail]
   );
 
+  const [showMessage, setShowMessage] = useState();
+
+  const trigger = () => {
+    setShowMessage(true);
+  };
+
   const activeRoom = useMemo(
     () => roomsForPlan.find((room) => room.displayId === activeRoomId),
     [roomsForPlan, activeRoomId]
@@ -281,6 +288,7 @@ const AdminDashboard = () => {
     const newEntity = response.data; 
     
     setFormStatus('Saved successfully');
+    trigger();
 
     if (endpoint.includes('/catalog/departments')) {
       setDepartments(prev => [...prev, newEntity]);
@@ -305,6 +313,7 @@ const AdminDashboard = () => {
 
   } catch (error) {
     setFormStatus(error.response?.data?.message || 'Failed to save');
+    trigger();
   }
 };
 
@@ -313,6 +322,7 @@ const AdminDashboard = () => {
     try {
       await apiClient.put(`${endpoint}/${id}`, payload);
       setFormStatus('Updated successfully');
+      trigger();
       
       // Handle course update with semester relationship
       if (endpoint === '/catalog/courses' && courseFormData.semesterId) {
@@ -368,6 +378,7 @@ const AdminDashboard = () => {
       await loadCoreData(activePlanId);
     } catch (error) {
       setFormStatus(error.response?.data?.message || 'Failed to update');
+      trigger();
     }
   };
 
@@ -376,9 +387,11 @@ const AdminDashboard = () => {
     try {
       await apiClient.delete(`${endpoint}/${id}`);
       setFormStatus('Deleted successfully');
+      trigger();
       await loadCoreData(activePlanId);
     } catch (error) {
       setFormStatus(error.response?.data?.message || 'Failed to delete');
+      trigger();
     }
   };
 
@@ -386,10 +399,12 @@ const AdminDashboard = () => {
     e.preventDefault();
     if (!primaryForm.roomId) {
       setFormStatus('Choose a classroom to generate its layout');
+      trigger();
       return;
     }
     if (!primaryForm.semesterIds.length) {
       setFormStatus('Select the semesters that should appear in this room');
+      trigger();
       return;
     }
     try {
@@ -406,10 +421,12 @@ const AdminDashboard = () => {
       setPrimaryForm((prev) => ({ ...prev, title: '' }));
       setSwapSeat(null);
       setFormStatus('Seating magically arranged ✦');
+      trigger();
       await loadCoreData(data.plan.id);
       setActiveRoomId(Number(primaryForm.roomId));
     } catch (error) {
       setFormStatus(error.response?.data?.message || 'Failed to create plan');
+      trigger();
     }
   };
 
@@ -422,8 +439,10 @@ const AdminDashboard = () => {
       });
       await handlePlanSelect(planDetail.plan.id);
       setFormStatus('Seats swapped');
+      trigger();
     } catch (error) {
       setFormStatus(error.response?.data?.message || 'Swap failed');
+      trigger();
     }
   };
 
@@ -498,6 +517,7 @@ const AdminDashboard = () => {
       doc.save(`${planDetail.plan.title}.pdf`);
     } catch (error) {
       setFormStatus('Failed to export PDF');
+      trigger();
     }
   };
 
@@ -511,6 +531,12 @@ const AdminDashboard = () => {
 
   return (
     <div className="min-h-screen px-6 md:px-10 py-10 text-white space-y-10">
+      <StatusMessage
+        message={formStatus}
+        show={showMessage}
+        duration={3000}
+        onClose={() => setShowMessage(false)}
+      />
       <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
         <div>
           <p className="text-xs uppercase tracking-[0.5em] text-gray-400">Admin Deck</p>
@@ -600,8 +626,7 @@ const AdminDashboard = () => {
                 Generate seating plan
               </button>
             </form>
-            {formStatus && <p className="text-sm text-accent">{formStatus}</p>}
-
+            
             <div className="border-t border-white/5 pt-4">
               <p className="text-xs uppercase tracking-[0.4em] text-gray-400">History</p>
               <div className="space-y-2 max-h-56 overflow-auto pr-2 no-scrollbar">
@@ -701,7 +726,7 @@ const AdminDashboard = () => {
         </div>
       </section>
 
-      <section className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+      <section className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 ">
         {/* Departments */}
         <div className="glass p-6 border border-white/10 space-y-4">
           <div>
@@ -749,7 +774,7 @@ const AdminDashboard = () => {
               </button>
             </form>
           )}
-          <div className="border-t border-white/5 pt-3 space-y-2 max-h-48 overflow-auto no-scrollbar">
+          <div className="border-t border-white/5 pt-3 space-y-2  overflow-auto max-h-[300px]">
             {departments.map((dept) => (
               <div key={dept.id} className="flex items-center justify-between p-2 rounded-xl bg-white/5">
                 <span className="text-sm truncate flex-1">{dept.name}</span>
