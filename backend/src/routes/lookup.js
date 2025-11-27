@@ -58,6 +58,7 @@ router.get('/semesters', async (_req, res) => {
        JOIN departments d ON d.id = sem.department_id
        ORDER BY sem.title ASC`
     );
+
     res.json(semesters);
   } catch (error) {
     console.error('Fetch semesters error', error);
@@ -65,40 +66,65 @@ router.get('/semesters', async (_req, res) => {
   }
 });
 
+
 router.post('/semesters', authMiddleware(), async (req, res) => {
   try {
     const { departmentId, title } = req.body;
-    if (!departmentId || !title) return res.status(400).json({ message: 'Department and title are required' });
+    if (!departmentId || !title)
+      return res.status(400).json({ message: 'Department and title are required' });
+
     const insert = await run(
       `INSERT INTO semesters (department_id, title)
        VALUES (?, ?)`,
       [departmentId, title]
     );
-    const semester = await get('SELECT * FROM semesters WHERE id = ?', [insert.lastID]);
+
+    const semester = await get(
+      `SELECT sem.*, d.name as department_name
+       FROM semesters sem
+       JOIN departments d ON d.id = sem.department_id
+       WHERE sem.id = ?`,
+      [insert.lastID]
+    );
+
     res.status(201).json(semester);
+
   } catch (error) {
     console.error('Create semester error', error);
     res.status(500).json({ message: 'Failed to create semester' });
   }
 });
 
+
 router.put('/semesters/:id', authMiddleware(), async (req, res) => {
   try {
     const { departmentId, title } = req.body;
-    if (!departmentId || !title) return res.status(400).json({ message: 'Department and title are required' });
+    if (!departmentId || !title)
+      return res.status(400).json({ message: 'Department and title are required' });
+
     await run(
       `UPDATE semesters
        SET department_id = ?, title = ?
        WHERE id = ?`,
       [departmentId, title, req.params.id]
     );
-    const semester = await get('SELECT * FROM semesters WHERE id = ?', [req.params.id]);
-    res.json(semester);
+
+    const updated = await get(
+      `SELECT sem.*, d.name as department_name
+       FROM semesters sem
+       JOIN departments d ON d.id = sem.department_id
+       WHERE sem.id = ?`,
+      [req.params.id]
+    );
+
+    res.json(updated);
+
   } catch (error) {
     console.error('Update semester error', error);
     res.status(500).json({ message: 'Failed to update semester' });
   }
 });
+
 
 router.delete('/semesters/:id', authMiddleware(), async (req, res) => {
   try {
@@ -109,6 +135,7 @@ router.delete('/semesters/:id', authMiddleware(), async (req, res) => {
     res.status(500).json({ message: 'Failed to delete semester' });
   }
 });
+
 
 // Rooms
 router.get('/rooms', async (_req, res) => {

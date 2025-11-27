@@ -5,150 +5,12 @@ import jsPDF from 'jspdf';
 import apiClient from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import StatusMessage from '../components/StatusMessage'
-
-const DashboardCard = ({ label, value, icon }) => (
-  <div className="glass p-6 border border-white/10 flex items-center gap-4">
-    <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center text-brand-400">
-      {icon}
-    </div>
-    <div>
-      <p className="text-gray-400 text-sm uppercase tracking-[0.4em]">{label}</p>
-      <p className="text-3xl font-display">{value}</p>
-    </div>
-  </div>
-);
-
-const Input = ({ label, ...props }) => (
-  <label className="text-sm text-gray-400 flex flex-col gap-1">
-    {label}
-    <input
-      {...props}
-      className="rounded-2xl bg-white/5 border border-white/10 px-4 py-3 text-white focus:border-brand-400 outline-none"
-    />
-  </label>
-);
-
-const Select = ({ label, children, ...props }) => (
-  <label className="text-sm text-gray-400 flex flex-col gap-1">
-    {label}
-    <select
-      {...props}
-      className="rounded-2xl bg-white/5 border border-white/10 px-4 py-3 text-white focus:border-brand-400 outline-none"
-    >
-      {children}
-    </select>
-  </label>
-);
-
-const MultiSelect = ({ label, options, value = [], onChange, ...props }) => {
-  // Ensure value is always an array
-  const selectedValues = Array.isArray(value) ? value : [];
-  
-  return (
-    <label className="text-sm text-gray-400 flex flex-col gap-1">
-      {label}
-      <select
-        {...props}
-        multiple
-        value={selectedValues}
-        onChange={(e) => {
-          const selected = Array.from(e.target.selectedOptions, (option) => option.value);
-          if (onChange) onChange(selected);
-        }}
-        className="rounded-2xl bg-white/5 border border-white/10 px-4 py-3 text-white focus:border-brand-400 outline-none min-h-[100px]"
-      >
-        {options.map((option) => (
-          <option key={option.id || option.value} value={option.id || option.value}>
-            {option.label || option.title || option.name || option.code}
-          </option>
-        ))}
-      </select>
-      <p className="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple</p>
-    </label>
-  );
-};
-
-const SeatGrid = ({ room, allocations, onSeatPick, selectedSeat }) => {
-  const roomId = room.room_id || room.id;
-  const rows = Number(room.rows) || 0;
-  const cols = Number(room.cols) || 0;
-  const capacity = Number(room.capacity) || rows * cols;
-  const seatMap = useMemo(() => {
-    const map = {};
-    allocations.forEach((seat) => {
-      map[`${seat.seat_row}-${seat.seat_col}`] = seat;
-    });
-    return map;
-  }, [allocations]);
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="uppercase text-xs tracking-[0.4em] text-gray-400">Room</p>
-          <h3 className="text-2xl font-display">{room.name}</h3>
-          <p className="text-sm text-gray-400">
-            {room.code} • {room.invigilator_name || 'Invigilator TBD'}
-          </p>
-        </div>
-        <div className="text-sm text-gray-400">
-          Capacity {capacity} • Grid {rows}x{cols}
-        </div>
-      </div>
-      <div className="rounded-3xl border border-white/10 p-4 bg-white/5">
-        <div
-          className="grid gap-2"
-          style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
-        >
-          {Array.from({ length: rows }).map((_, rowIndex) =>
-            Array.from({ length: cols }).map((_, colIndex) => {
-              const row = rowIndex + 1;
-              const col = colIndex + 1;
-              const seat = seatMap[`${row}-${col}`];
-              const key = `${row}-${col}`;
-              const isSelected =
-                selectedSeat &&
-                selectedSeat.seat_row === row &&
-                selectedSeat.seat_col === col &&
-                selectedSeat.room_id === roomId;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => seat && onSeatPick({ ...seat, room_id: roomId, room_name: room.name })}
-                  className={`rounded-2xl px-3 py-2 text-left border text-xs transition ${
-                    seat
-                      ? 'bg-brand-500/10 border-brand-500/40 text-white hover:bg-brand-500/20'
-                      : 'bg-white/5 border-white/10 text-gray-500 cursor-not-allowed'
-                  } ${isSelected ? 'ring-2 ring-accent' : ''}`}
-                >
-                  {seat ? (
-                    <>
-                      <p className="font-semibold">{seat.roll_no}</p>
-                      <p className="text-[10px] text-gray-200 truncate">{seat.full_name}</p>
-                      <p className="text-[10px] text-gray-400">
-                        {seat.semester_title || 'Semester TBD'}
-                      </p>
-                      <p className="text-[10px] text-gray-500">
-                        {seat.department_name || 'Department TBD'}
-                      </p>
-                    </>
-                  ) : (
-                    'EMPTY'
-                  )}
-                </button>
-              );
-            })
-          )}
-        </div>
-        <p className="text-xs text-gray-400 mt-3">
-          Click two occupied seats to trigger a validated swap. The backend enforces uniqueness and
-          atomic updates.
-        </p>
-      </div>
-    </div>
-  );
-};
+import { Link } from 'react-router-dom';
+import DashboardCard from '../components/DashboardCard';
+import Input from '../components/Input';
+import Select from '../components/Select';
+import MultiSelect from '../components/MultiSelect';
+import SeatGrid from '../components/SeatGrid';
 
 const AdminDashboard = () => {
   const { user, logout } = useAuthStore();
@@ -283,39 +145,40 @@ const AdminDashboard = () => {
   };
 
   const handleEntityCreate = async (endpoint, payload) => {
-  try {
-    const response = await apiClient.post(endpoint, payload);
-    const newEntity = response.data; 
-    
-    setFormStatus('Saved successfully');
-    trigger();
+    try {
+      const response = await apiClient.post(endpoint, payload);
+      const newEntity = response.data;
 
-    if (endpoint.includes('/catalog/departments')) {
-      setDepartments(prev => [...prev, newEntity]);
+      setFormStatus('Saved successfully');
+      trigger();
+
+      if (endpoint.includes('/catalog/departments')) {
+        setDepartments(prev => [...prev, newEntity]);
+      }
+
+      else if (endpoint.includes('/catalog/semesters')) {
+        setSemesters(prev => [...prev, newEntity]);
+        console.log(newEntity);
+      }
+
+      else if (endpoint.includes('/catalog/rooms')) {
+        setRooms(prev => [...prev, newEntity]);
+      }
+
+      else if (endpoint.includes('/catalog/courses')) {
+        setCourses(prev => [...prev, newEntity]);
+      }
+
+      else if (endpoint.includes('/students')) {
+        console.log(newEntity);
+        setStudents(prev => [...prev, newEntity]);
+      }
+
+    } catch (error) {
+      setFormStatus(error.response?.data?.message || 'Failed to save');
+      trigger();
     }
-
-    else if (endpoint.includes('/catalog/semesters')) {
-      setSemesters(prev => [...prev, newEntity]);
-    }
-
-    else if (endpoint.includes('/catalog/rooms')) {
-      setRooms(prev => [...prev, newEntity]);
-    }
-
-    else if (endpoint.includes('/catalog/courses')) {
-      setCourses(prev => [...prev, newEntity]);
-    }
-
-    else if (endpoint.includes('/students')) {
-      console.log(newEntity);
-      setStudents(prev => [...prev, newEntity]);
-    }
-
-  } catch (error) {
-    setFormStatus(error.response?.data?.message || 'Failed to save');
-    trigger();
-  }
-};
+  };
 
 
   const handleEntityUpdate = async (endpoint, id, payload) => {
@@ -323,7 +186,7 @@ const AdminDashboard = () => {
       await apiClient.put(`${endpoint}/${id}`, payload);
       setFormStatus('Updated successfully');
       trigger();
-      
+
       // Handle course update with semester relationship
       if (endpoint === '/catalog/courses' && courseFormData.semesterId) {
         // First, remove existing semester-course relationships for this course
@@ -335,7 +198,7 @@ const AdminDashboard = () => {
             console.error('Failed to remove semester-course relationship', err);
           }
         }
-        
+
         // Then, add new relationship
         try {
           await apiClient.post('/catalog/semester-courses', {
@@ -348,7 +211,7 @@ const AdminDashboard = () => {
         }
         setCourseFormData({ semesterId: '', examDate: '' });
       }
-      
+
       // Handle student update with course relationships
       if (endpoint === '/students' && studentFormData.courseIds.length > 0) {
         // First, remove existing student-course relationships for this student
@@ -360,7 +223,7 @@ const AdminDashboard = () => {
             console.error('Failed to remove student-course relationship', err);
           }
         }
-        
+
         // Then, add new relationships
         for (const courseId of studentFormData.courseIds) {
           try {
@@ -374,7 +237,7 @@ const AdminDashboard = () => {
         }
         setStudentFormData({ courseIds: [] });
       }
-      
+
       await loadCoreData(activePlanId);
     } catch (error) {
       setFormStatus(error.response?.data?.message || 'Failed to update');
@@ -548,13 +411,21 @@ const AdminDashboard = () => {
             </button>
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => loadCoreData(activePlanId)}
-          className="px-5 py-3 rounded-2xl border border-white/10 bg-white/5 flex items-center gap-2"
-        >
-          <FiRefreshCw /> Refresh data
-        </button>
+        <div className='flex gap-[8px]'>
+          <Link
+            to="/dashboard/detail"
+            className="px-5 py-3 rounded-2xl border border-white/10 bg-white/5 flex items-center gap-2"
+          >
+            Manage
+          </Link>
+          <button
+            type="button"
+            onClick={() => loadCoreData(activePlanId)}
+            className="px-5 py-3 rounded-2xl border border-white/10 bg-white/5 flex items-center gap-2"
+          >
+            <FiRefreshCw /> Refresh data
+          </button>
+        </div>
       </header>
 
       <section className="grid md:grid-cols-3 gap-6">
@@ -626,20 +497,19 @@ const AdminDashboard = () => {
                 Generate seating plan
               </button>
             </form>
-            
+
             <div className="border-t border-white/5 pt-4">
               <p className="text-xs uppercase tracking-[0.4em] text-gray-400">History</p>
-              <div className="space-y-2 max-h-56 overflow-auto pr-2 no-scrollbar">
+              <div className="space-y-2 max-h-56 overflow-auto pr-2">
                 {plans.map((plan) => (
                   <button
                     key={plan.id}
                     type="button"
                     onClick={() => handlePlanSelect(plan.id)}
-                    className={`w-full text-left px-4 py-3 rounded-2xl border transition ${
-                      activePlanId === plan.id
-                        ? 'border-brand-500 bg-brand-500/10'
-                        : 'border-white/10 bg-white/5 hover:border-white/30'
-                    }`}
+                    className={`w-full text-left px-4 py-3 rounded-2xl border transition ${activePlanId === plan.id
+                      ? 'border-brand-500 bg-brand-500/10'
+                      : 'border-white/10 bg-white/5 hover:border-white/30'
+                      }`}
                   >
                     <p className="font-medium">{plan.title}</p>
                     <p className="text-xs text-gray-400">
@@ -687,11 +557,10 @@ const AdminDashboard = () => {
                         key={room.displayId}
                         type="button"
                         onClick={() => handleRoomSwitch(room.displayId)}
-                        className={`px-3 py-2 rounded-2xl border text-sm ${
-                          activeRoomId === room.displayId
-                            ? 'border-brand-500 bg-brand-500/10'
-                            : 'border-white/10 bg-white/5'
-                        }`}
+                        className={`px-3 py-2 rounded-2xl border text-sm ${activeRoomId === room.displayId
+                          ? 'border-brand-500 bg-brand-500/10'
+                          : 'border-white/10 bg-white/5'
+                          }`}
                       >
                         {room.name}
                       </button>
@@ -868,11 +737,11 @@ const AdminDashboard = () => {
               </button>
             </form>
           )}
-          <div className="border-t border-white/5 pt-3 space-y-2 max-h-48 overflow-auto no-scrollbar">
+          <div className="border-t border-white/5 pt-3 custom-scroll space-y-2 max-h-[300px] overflow-auto">
             {semesters.map((sem) => (
               <div key={sem.id} className="flex items-center justify-between p-2 rounded-xl bg-white/5">
                 <div className="flex-1 min-w-0">
-                  <span className="text-sm block truncate">{sem.title}</span>
+                  <span className="text-sm block truncate">{sem.title + ' ' + sem.department_name}</span>
                 </div>
                 <div className="flex gap-1">
                   <button
@@ -970,7 +839,7 @@ const AdminDashboard = () => {
               </button>
             </form>
           )}
-          <div className="border-t border-white/5 pt-3 space-y-2 max-h-48 overflow-auto no-scrollbar">
+          <div className="border-t border-white/5 pt-3 space-y-2 max-h-[300px] overflow-auto">
             {rooms.map((room) => (
               <div key={room.id} className="flex items-center justify-between p-2 rounded-xl bg-white/5">
                 <div className="flex-1 min-w-0">
@@ -1012,16 +881,16 @@ const AdminDashboard = () => {
                 const formData = new FormData(e.currentTarget);
                 const selectElement = e.target.querySelector('[name="studentCourses"]');
                 const courseIds = Array.from(selectElement.selectedOptions, (opt) => opt.value);
-                
+
                 setStudentFormData({ courseIds });
-                
+
                 await handleEntityUpdate('/students', editingStudent.id, {
                   fullName: formData.get('studentName'),
                   rollNo: formData.get('studentRoll'),
                   semesterId: Number(formData.get('studentSemester')),
                   seatPref: formData.get('seatPref'),
                 });
-                
+
                 setEditingStudent(null);
                 e.currentTarget.reset();
               }}
@@ -1070,9 +939,9 @@ const AdminDashboard = () => {
                 const formData = new FormData(e.currentTarget);
                 const selectElement = e.target.querySelector('[name="studentCourses"]');
                 const courseIds = Array.from(selectElement.selectedOptions, (opt) => opt.value);
-                
+
                 setStudentFormData({ courseIds });
-                
+
                 await handleEntityCreate('/students', {
                   fullName: formData.get('studentName'),
                   rollNo: formData.get('studentRoll'),
@@ -1080,8 +949,8 @@ const AdminDashboard = () => {
                   seatPref: formData.get('seatPref'),
                   courseIds: courseIds,
                 });
-                
-                e.currentTarget.reset();                
+
+                e.currentTarget.reset();
               }}
             >
               <Input label="Full name" name="studentName" placeholder="Areeba Khan" required />
@@ -1107,7 +976,7 @@ const AdminDashboard = () => {
               </button>
             </form>
           )}
-          <div className="border-t border-white/5 pt-3 space-y-2 max-h-48 overflow-auto no-scrollbar">
+          <div className="border-t border-white/5 pt-3 space-y-2 max-h-[300px] overflow-auto">
             {students.slice(0, 10).map((student) => (
               <div key={student.id} className="flex items-center justify-between p-2 rounded-xl bg-white/5">
                 <div className="flex-1 min-w-0">
@@ -1152,26 +1021,26 @@ const AdminDashboard = () => {
                 const formData = new FormData(e.currentTarget);
                 const semesterId = formData.get('courseSemester');
                 const examDate = formData.get('courseExamDate') || '';
-                
+
                 setCourseFormData({
                   semesterId,
                   examDate,
                 });
-                
+
                 await handleEntityUpdate('/catalog/courses', editingCourse.id, {
                   code: formData.get('courseCode'),
                   title: formData.get('courseTitle'),
                 });
-                
+
                 setEditingCourse(null);
                 e.currentTarget.reset();
               }}
             >
               <Input label="Course code" name="courseCode" defaultValue={editingCourse.code} required />
               <Input label="Course title" name="courseTitle" defaultValue={editingCourse.title} required />
-              <Select 
-                label="Semester" 
-                name="courseSemester" 
+              <Select
+                label="Semester"
+                name="courseSemester"
                 defaultValue={(() => {
                   const firstRelation = semesterCourses.find(sc => sc.course_id === editingCourse.id);
                   return firstRelation?.semester_id || '';
@@ -1185,10 +1054,10 @@ const AdminDashboard = () => {
                   </option>
                 ))}
               </Select>
-              <Input 
-                label="Exam date" 
-                name="courseExamDate" 
-                type="date" 
+              <Input
+                label="Exam date"
+                name="courseExamDate"
+                type="date"
                 defaultValue={(() => {
                   const firstRelation = semesterCourses.find(sc => sc.course_id === editingCourse.id);
                   return firstRelation?.exam_date || '';
@@ -1218,27 +1087,27 @@ const AdminDashboard = () => {
                 const formData = new FormData(e.currentTarget);
                 const semesterId = formData.get('courseSemester');
                 const examDate = formData.get('courseExamDate') || '';
-                
+
                 setCourseFormData({
                   semesterId,
                   examDate,
                 });
-                
+
                 await handleEntityCreate('/catalog/courses', {
                   code: formData.get('courseCode'),
                   title: formData.get('courseTitle'),
                 });
-                
+
                 e.currentTarget.reset();
                 setCourseFormData({ semesterId: '', examDate: '' });
               }}
             >
               <Input label="Course code" name="courseCode" placeholder="CS-301" required />
               <Input label="Course title" name="courseTitle" placeholder="Data Structures" required />
-              <Select 
-                label="Semester" 
-                name="courseSemester" 
-                value={courseFormData.semesterId} 
+              <Select
+                label="Semester"
+                name="courseSemester"
+                value={courseFormData.semesterId}
                 onChange={(e) => setCourseFormData(prev => ({ ...prev, semesterId: e.target.value }))}
                 required
               >
@@ -1255,7 +1124,7 @@ const AdminDashboard = () => {
               </button>
             </form>
           )}
-          <div className="border-t border-white/5 pt-3 space-y-2 max-h-48 overflow-auto no-scrollbar">
+          <div className="border-t border-white/5 pt-3 space-y-2 max-h-[300px] overflow-auto">
             {courses.map((course) => (
               <div key={course.id} className="flex items-center justify-between p-2 rounded-xl bg-white/5">
                 <div className="flex-1 min-w-0">

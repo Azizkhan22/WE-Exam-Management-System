@@ -6,6 +6,7 @@ import StudentSeatPage from './pages/StudentSeatPage';
 import AdminDashboard from './pages/AdminDashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 import { useAuthStore } from './store/authStore';
+import DetailEntities from './pages/DetailEntities';
 
 const App = () => {
   const initialize = useAuthStore((state) => state.initialize);
@@ -24,6 +25,14 @@ const App = () => {
         element={
           <ProtectedRoute>
             <AdminDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/dashboard/detail"
+        element={
+          <ProtectedRoute>
+            <DetailEntities />
           </ProtectedRoute>
         }
       />
