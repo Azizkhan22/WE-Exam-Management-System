@@ -37,6 +37,8 @@ body {
 .glass select option {
   background-color: #0b1120;
   color: #f8fafc;
+  border-radius: 5px;
+  margin:3px;
 }
 
 .glass select::-ms-expand {

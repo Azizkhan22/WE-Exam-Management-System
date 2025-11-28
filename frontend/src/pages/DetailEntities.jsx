@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FiUsers, FiGrid, FiLayers, FiDownload,FiArrowLeft , FiRefreshCw, FiEdit2, FiTrash2, FiX } from 'react-icons/fi';
+import { FiUsers, FiGrid, FiLayers, FiDownload, FiArrowLeft, FiRefreshCw, FiEdit2, FiTrash2, FiX } from 'react-icons/fi';
 import dayjs from 'dayjs';
 import jsPDF from 'jspdf';
 import apiClient from '../services/api';
@@ -20,6 +20,14 @@ const DetailEntities = () => {
     const [rooms, setRooms] = useState([]);
     const [courses, setCourses] = useState([]);
     const [students, setStudents] = useState([]);
+
+    const [searchDepartments, setSearchDepartments] = useState([]);
+    const [searchSemesters, setSearchSemesters] = useState([]);
+    const [searchRooms, setSearchRooms] = useState([]);
+    const [searchCourses, setSearchCourses] = useState([]);
+    const [searchStudents, setSearchStudents] = useState([]);
+    const [isSearching, setIsSearching] = useState(false);
+
     const [semesterCourses, setSemesterCourses] = useState([]);
     const [studentCourses, setStudentCourses] = useState([]);
     const [editingDept, setEditingDept] = useState(null);
@@ -27,6 +35,7 @@ const DetailEntities = () => {
     const [editingRoom, setEditingRoom] = useState(null);
     const [editingStudent, setEditingStudent] = useState(null);
     const [editingCourse, setEditingCourse] = useState(null);
+    const [semesterSelectedCourses, setsemesterSelectedCourses] = useState([]);
     const [courseFormData, setCourseFormData] = useState({ semesterId: '', examDate: '' });
     const [studentFormData, setStudentFormData] = useState({ courseIds: [] });
     const [loading, setLoading] = useState(true);
@@ -68,6 +77,38 @@ const DetailEntities = () => {
         loadCoreData();
     }, []);
 
+    const searchEntity = (query, entityType) => {
+        if (query === '') {
+            setIsSearching(false);
+            return;
+        }
+        setIsSearching(true);
+        query = query.toLowerCase();
+        if (entityType === 'students') {
+            const filteredStudents = students.filter(student =>
+                student.full_name.toLowerCase().includes(query) ||
+                student.roll_no.toLowerCase().includes(query)
+            );
+            setSearchStudents(filteredStudents);
+        } else if (entityType === 'departments') {
+            const filteredDepts = departments.filter(dept =>
+                dept.name.toLowerCase().includes(query));
+            setSearchDepartments(filteredDepts);
+        } else if (entityType === 'rooms') {
+            const filteredRooms = rooms.filter(room =>
+                room.name.toLowerCase().includes(query) || room.code.toLowerCase().includes(query));
+            setSearchRooms(filteredRooms);
+        } else if (entityType === 'courses') {
+            const filteredCourses = courses.filter(course =>
+                course.title.toLowerCase().includes(query) || course.code.toLowerCase().includes(query));
+            setSearchCourses(filteredCourses);
+        } else if (entityType === 'semesters') {
+            const filteredSems = semesters.filter(sem =>
+                sem.title.toLowerCase().includes(query) || sem.department_name.toLowerCase().includes(query));
+            setSearchSemesters(filteredSems);
+        }
+    };
+
     // === CRUD handlers ===
     const handleEntityCreate = async (endpoint, payload) => {
         try {
@@ -93,7 +134,6 @@ const DetailEntities = () => {
             setFormStatus('Updated successfully');
             triggerMessage();
 
-            // Student / Course relationships handled outside this snippet
             await loadCoreData();
         } catch (error) {
             setFormStatus(error.response?.data?.message || 'Failed to update');
@@ -213,11 +253,34 @@ const DetailEntities = () => {
                                     </div>
                                 </form>
                             )}
-                            <div>
-                                <h3 className="text-xl font-display">All {activeTab}</h3>
+                            <div className='flex items-center gap-[20px] w-full'>
+                                <h3 className="text-xl font-display flex-2">All {activeTab}</h3>
+                                <div className='flex-1'>
+                                    <Input name="searchQuery" placeholder="Search departments..." onChange={(e) => searchEntity(e.target.value, activeTab)} />
+                                </div>
                             </div>
                             <div className="border-t border-white/5 pt-3 space-y-2  overflow-auto max-h-[300px]">
-                                {departments.map((dept) => (
+                                {isSearching ? searchDepartments.map((dept) => (
+                                    <div key={dept.id} className="flex items-center justify-between p-2 rounded-xl bg-white/5">
+                                        <span className="text-sm truncate flex-1">{dept.name}</span>
+                                        <div className="flex gap-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => setEditingDept(dept)}
+                                                className="p-1.5 rounded-lg hover:bg-white/10"
+                                            >
+                                                <FiEdit2 size={14} />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleEntityDelete('/catalog/departments', dept.id)}
+                                                className="p-1.5 rounded-lg hover:bg-red-500/20"
+                                            >
+                                                <FiTrash2 size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                )) : departments.map((dept) => (
                                     <div key={dept.id} className="flex items-center justify-between p-2 rounded-xl bg-white/5">
                                         <span className="text-sm truncate flex-1">{dept.name}</span>
                                         <div className="flex gap-1">
@@ -238,6 +301,9 @@ const DetailEntities = () => {
                                         </div>
                                     </div>
                                 ))}
+                                {isSearching && searchDepartments.length === 0 && (
+                                    <p className="text-sm text-gray-400">No departments found.</p>
+                                )}
                             </div>
                         </div>
                     )}
@@ -275,7 +341,7 @@ const DetailEntities = () => {
                                         <option value="">Select</option>
                                         {semesters.map((sem) => (
                                             <option key={sem.id} value={sem.id}>
-                                                {sem.title}
+                                                {sem.title + " " + sem.department_name}
                                             </option>
                                         ))}
                                     </Select>
@@ -288,9 +354,8 @@ const DetailEntities = () => {
                                             // This will be handled by the form submission
                                         }}
                                     />
-                                    <Input label="Seat preference" name="seatPref" defaultValue={editingStudent.seat_pref || ''} />
-                                    <div className="flex gap-2">
-                                        <button type="submit" className="flex-1 py-2 rounded-2xl bg-brand-500/20 border border-brand-500/40">
+                                    <div className="flex justify-center items-center gap-2">
+                                        <button type="submit" className="flex-1 py-2 rounded-2xl bg-brand-500/20 border border-brand-500/40 max-w-[200px]">
                                             Update
                                         </button>
                                         <button
@@ -328,12 +393,12 @@ const DetailEntities = () => {
                                     }}
                                 >
                                     <Input label="Full name" name="studentName" placeholder="Areeba Khan" required />
-                                    <Input label="Roll number" name="studentRoll" placeholder="CS-23-055" required />
+                                    <Input label="Roll number" name="studentRoll" placeholder="455677" required />
                                     <Select label="Semester" name="studentSemester" required>
                                         <option value="">Select</option>
                                         {semesters.map((sem) => (
                                             <option key={sem.id} value={sem.id}>
-                                                {sem.title}
+                                                {sem.title + " " + sem.department_name}
                                             </option>
                                         ))}
                                     </Select>
@@ -344,14 +409,44 @@ const DetailEntities = () => {
                                         value={studentFormData.courseIds}
                                         onChange={(selected) => setStudentFormData(prev => ({ ...prev, courseIds: selected }))}
                                     />
-                                    <Input label="Seat preference" name="seatPref" placeholder="Optional note" />
-                                    <button type="submit" className="w-full py-2 rounded-2xl bg-white/10 border border-white/10">
-                                        Save student
-                                    </button>
+                                    <div className='flex w-full justify-center items-center'>
+                                        <button type="submit" className="w-full py-2 rounded-2xl bg-white/10 border border-white/10 max-w-[200px]">
+                                            Save student
+                                        </button>
+                                    </div>
                                 </form>
                             )}
+                            <div className='flex items-center gap-[20px] w-full'>
+                                <h3 className="text-xl font-display flex-2">All {activeTab}</h3>
+                                <div className='flex-1'>
+                                    <Input name="searchQuery" placeholder="Search students..." onChange={(e) => searchEntity(e.target.value, activeTab)} />
+                                </div>
+                            </div>
                             <div className="border-t border-white/5 pt-3 space-y-2 max-h-[300px] overflow-auto">
-                                {students.slice(0, 10).map((student) => (
+                                {isSearching ? searchStudents.map((student) => (
+                                    <div key={student.id} className="flex items-center justify-between p-2 rounded-xl bg-white/5">
+                                        <div className="flex-1 min-w-0">
+                                            <span className="text-sm block truncate">{student.full_name}</span>
+                                            <span className="text-xs text-gray-500">{student.roll_no}</span>
+                                        </div>
+                                        <div className="flex gap-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => setEditingStudent(student)}
+                                                className="p-1.5 rounded-lg hover:bg-white/10"
+                                            >
+                                                <FiEdit2 size={14} />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleEntityDelete('/students', student.id)}
+                                                className="p-1.5 rounded-lg hover:bg-red-500/20"
+                                            >
+                                                <FiTrash2 size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                )) : students.map((student) => (
                                     <div key={student.id} className="flex items-center justify-between p-2 rounded-xl bg-white/5">
                                         <div className="flex-1 min-w-0">
                                             <span className="text-sm block truncate">{student.full_name}</span>
@@ -375,14 +470,14 @@ const DetailEntities = () => {
                                         </div>
                                     </div>
                                 ))}
-                                {students.length > 10 && (
-                                    <p className="text-xs text-gray-500 text-center">+{students.length - 10} more</p>
+                                {isSearching && searchStudents.length === 0 && (
+                                    <p className="text-sm text-gray-400">No students found.</p>
                                 )}
                             </div>
                         </div>
                     )}
                     {activeTab === 'rooms' && (
-                        <div className="glass p-6 border border-white/10 space-y-4">
+                        <div className="glass p-6 border border-white/10 space-y-4 w-full">
                             <div>
                                 <p className="text-xs uppercase tracking-[0.4em] text-gray-400">Rooms</p>
                                 <h3 className="text-xl font-display">Capacity + layout</h3>
@@ -413,8 +508,8 @@ const DetailEntities = () => {
                                         <Input label="Cols" name="roomCols" type="number" defaultValue={editingRoom.cols} required />
                                     </div>
                                     <Input label="Invigilator" name="invigilator" defaultValue={editingRoom.invigilator_name || ''} />
-                                    <div className="flex gap-2">
-                                        <button type="submit" className="flex-1 py-2 rounded-2xl bg-brand-500/20 border border-brand-500/40">
+                                    <div className="flex gap-2 justify-center items-center">
+                                        <button type="submit" className="flex-1 py-2 rounded-2xl bg-brand-500/20 border border-brand-500/40 max-w-[200px]">
                                             Update
                                         </button>
                                         <button
@@ -451,13 +546,45 @@ const DetailEntities = () => {
                                         <Input label="Cols" name="roomCols" type="number" required />
                                     </div>
                                     <Input label="Invigilator" name="invigilator" placeholder="Prof. Nauman" />
-                                    <button type="submit" className="w-full py-2 rounded-2xl bg-white/10 border border-white/10">
-                                        Save room
-                                    </button>
+                                    <div className='flex justify-center items-center w-full'>
+                                        <button type="submit" className="w-full py-2 rounded-2xl bg-white/10 border border-white/10 max-w-[200px]">
+                                            Save room
+                                        </button>
+                                    </div>
+
                                 </form>
                             )}
+                            <div className='flex items-center gap-[20px] w-full'>
+                                <h3 className="text-xl font-display flex-2">All {activeTab}</h3>
+                                <div className='flex-1'>
+                                    <Input name="searchQuery" placeholder="Search rooms..." onChange={(e) => searchEntity(e.target.value, activeTab)} />
+                                </div>
+                            </div>
                             <div className="border-t border-white/5 pt-3 space-y-2 max-h-[300px] overflow-auto">
-                                {rooms.map((room) => (
+                                {isSearching ? searchRooms.map((room) => (
+                                    <div key={room.id} className="flex items-center justify-between p-2 rounded-xl bg-white/5">
+                                        <div className="flex-1 min-w-0">
+                                            <span className="text-sm block truncate">{room.name}</span>
+                                            <span className="text-xs text-gray-500">{room.code} • {room.capacity} seats</span>
+                                        </div>
+                                        <div className="flex gap-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => setEditingRoom(room)}
+                                                className="p-1.5 rounded-lg hover:bg-white/10"
+                                            >
+                                                <FiEdit2 size={14} />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleEntityDelete('/catalog/rooms', room.id)}
+                                                className="p-1.5 rounded-lg hover:bg-red-500/20"
+                                            >
+                                                <FiTrash2 size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                )) : rooms.map((room) => (
                                     <div key={room.id} className="flex items-center justify-between p-2 rounded-xl bg-white/5">
                                         <div className="flex-1 min-w-0">
                                             <span className="text-sm block truncate">{room.name}</span>
@@ -481,11 +608,14 @@ const DetailEntities = () => {
                                         </div>
                                     </div>
                                 ))}
+                                {isSearching && searchRooms.length === 0 && (
+                                    <p className="text-sm text-gray-400">No rooms found.</p>
+                                )}
                             </div>
                         </div>
                     )}
                     {activeTab === 'courses' && (
-                        <div className="glass p-6 border border-white/10 space-y-4">
+                        <div className="glass p-6 border border-white/10 space-y-4 w-full">
                             <div>
                                 <p className="text-xs uppercase tracking-[0.4em] text-gray-400">Courses</p>
                                 <h3 className="text-xl font-display">Manage courses</h3>
@@ -515,22 +645,6 @@ const DetailEntities = () => {
                                 >
                                     <Input label="Course code" name="courseCode" defaultValue={editingCourse.code} required />
                                     <Input label="Course title" name="courseTitle" defaultValue={editingCourse.title} required />
-                                    <Select
-                                        label="Semester"
-                                        name="courseSemester"
-                                        defaultValue={(() => {
-                                            const firstRelation = semesterCourses.find(sc => sc.course_id === editingCourse.id);
-                                            return firstRelation?.semester_id || '';
-                                        })()}
-                                        required
-                                    >
-                                        <option value="">Select semester</option>
-                                        {semesters.map((sem) => (
-                                            <option key={sem.id} value={sem.id}>
-                                                {sem.title}
-                                            </option>
-                                        ))}
-                                    </Select>
                                     <Input
                                         label="Exam date"
                                         name="courseExamDate"
@@ -540,8 +654,8 @@ const DetailEntities = () => {
                                             return firstRelation?.exam_date || '';
                                         })()}
                                     />
-                                    <div className="flex gap-2">
-                                        <button type="submit" className="flex-1 py-2 rounded-2xl bg-brand-500/20 border border-brand-500/40">
+                                    <div className="flex justify-center items-center gap-2">
+                                        <button type="submit" className="flex-1 py-2 rounded-2xl bg-brand-500/20 border border-brand-500/40 max-w-[200px]">
                                             Update
                                         </button>
                                         <button
@@ -581,28 +695,45 @@ const DetailEntities = () => {
                                 >
                                     <Input label="Course code" name="courseCode" placeholder="CS-301" required />
                                     <Input label="Course title" name="courseTitle" placeholder="Data Structures" required />
-                                    <Select
-                                        label="Semester"
-                                        name="courseSemester"
-                                        value={courseFormData.semesterId}
-                                        onChange={(e) => setCourseFormData(prev => ({ ...prev, semesterId: e.target.value }))}
-                                        required
-                                    >
-                                        <option value="">Select semester</option>
-                                        {semesters.map((sem) => (
-                                            <option key={sem.id} value={sem.id}>
-                                                {sem.title}
-                                            </option>
-                                        ))}
-                                    </Select>
                                     <Input label="Exam date" name="courseExamDate" type="date" value={courseFormData.examDate} onChange={(e) => setCourseFormData(prev => ({ ...prev, examDate: e.target.value }))} />
-                                    <button type="submit" className="w-full py-2 rounded-2xl bg-white/10 border border-white/10">
-                                        Save course
-                                    </button>
+                                    <div className='flex justify-center items-center w-full'>
+                                        <button type="submit" className="w-full py-2 rounded-2xl bg-white/10 border border-white/10 max-w-[200px]">
+                                            Save course
+                                        </button>
+                                    </div>
                                 </form>
                             )}
+                            <div className='flex items-center gap-[20px] w-full'>
+                                <h3 className="text-xl font-display flex-2">All {activeTab}</h3>
+                                <div className='flex-1'>
+                                    <Input name="searchQuery" placeholder="Search courses..." onChange={(e) => searchEntity(e.target.value, activeTab)} />
+                                </div>
+                            </div>
                             <div className="border-t border-white/5 pt-3 space-y-2 max-h-[300px] overflow-auto">
-                                {courses.map((course) => (
+                                {isSearching ? searchCourses.map((course) => (
+                                    <div key={course.id} className="flex items-center justify-between p-2 rounded-xl bg-white/5">
+                                        <div className="flex-1 min-w-0">
+                                            <span className="text-sm block truncate">{course.title}</span>
+                                            <span className="text-xs text-gray-500">{course.code}</span>
+                                        </div>
+                                        <div className="flex gap-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => setEditingCourse(course)}
+                                                className="p-1.5 rounded-lg hover:bg-white/10"
+                                            >
+                                                <FiEdit2 size={14} />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleEntityDelete('/catalog/courses', course.id)}
+                                                className="p-1.5 rounded-lg hover:bg-red-500/20"
+                                            >
+                                                <FiTrash2 size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                )) : courses.map((course) => (
                                     <div key={course.id} className="flex items-center justify-between p-2 rounded-xl bg-white/5">
                                         <div className="flex-1 min-w-0">
                                             <span className="text-sm block truncate">{course.title}</span>
@@ -626,11 +757,14 @@ const DetailEntities = () => {
                                         </div>
                                     </div>
                                 ))}
+                                {isSearching && searchCourses.length === 0 && (
+                                    <p className="text-sm text-gray-400">No courses found.</p>
+                                )}
                             </div>
                         </div>
                     )}
                     {activeTab === 'semesters' && (
-                        <div className="glass p-6 border border-white/10 space-y-4">
+                        <div className="glass p-6 border border-white/10 space-y-4 w-full">
                             <div>
                                 <p className="text-xs uppercase tracking-[0.4em] text-gray-400">Semesters</p>
                                 <h3 className="text-xl font-display">Per department</h3>
@@ -644,6 +778,7 @@ const DetailEntities = () => {
                                         handleEntityUpdate('/catalog/semesters', editingSem.id, {
                                             departmentId: Number(formData.get('semesterDepartment')),
                                             title: formData.get('semesterTitle'),
+                                            semesterCourses: formData.getAll('semesterCourses[]'),
                                         });
                                         setEditingSem(null);
                                         e.currentTarget.reset();
@@ -658,8 +793,15 @@ const DetailEntities = () => {
                                         ))}
                                     </Select>
                                     <Input label="Semester title" name="semesterTitle" defaultValue={editingSem.title} required />
-                                    <div className="flex gap-2">
-                                        <button type="submit" className="flex-1 py-2 rounded-2xl bg-brand-500/20 border border-brand-500/40">
+                                    <MultiSelect
+                                        label="Semester's Courses (For updation of courses select the all updated courses)"
+                                        name="semesterCourses[]"
+                                        options={courses}
+                                        value={semesterSelectedCourses}
+                                        onChange={(selected) => setsemesterSelectedCourses(selected)}
+                                    />
+                                    <div className="flex justify-center items-center gap-2 w-full">
+                                        <button type="submit" className="flex-1 py-2 rounded-2xl bg-brand-500/20 border border-brand-500/40 w-full max-w-[200px]">
                                             Update
                                         </button>
                                         <button
@@ -680,6 +822,7 @@ const DetailEntities = () => {
                                         handleEntityCreate('/catalog/semesters', {
                                             departmentId: Number(formData.get('semesterDepartment')),
                                             title: formData.get('semesterTitle'),
+                                            semesterCourses: formData.getAll('semesterCourses[]'),
                                         });
                                         e.currentTarget.reset();
                                     }}
@@ -693,13 +836,51 @@ const DetailEntities = () => {
                                         ))}
                                     </Select>
                                     <Input label="Semester title" name="semesterTitle" placeholder="BSCS - Term V" required />
-                                    <button type="submit" className="w-full py-2 rounded-2xl bg-white/10 border border-white/10">
-                                        Save semester
-                                    </button>
+                                    <MultiSelect
+                                        label="Semester's Courses (select multiple)"
+                                        name="semesterCourses[]"
+                                        options={courses}
+                                        value={semesterSelectedCourses}
+                                        onChange={(selected) => setsemesterSelectedCourses(selected)}
+                                    />
+                                    <div className='flex justify-center items-center w-full'>
+                                        <button type="submit" className="w-full py-2 rounded-2xl bg-white/10 border border-white/10 max-w-[200px]">
+                                            Save semester
+                                        </button>
+                                    </div>
+
                                 </form>
                             )}
+                            <div className='flex items-center gap-[20px] w-full'>
+                                <h3 className="text-xl font-display flex-2">All {activeTab}</h3>
+                                <div className='flex-1'>
+                                    <Input name="searchQuery" placeholder="Search semesters..." onChange={(e) => searchEntity(e.target.value, activeTab)} />
+                                </div>
+                            </div>
                             <div className="border-t border-white/5 pt-3 custom-scroll space-y-2 max-h-[300px] overflow-auto">
-                                {semesters.map((sem) => (
+                                {isSearching ? searchSemesters.map((sem) => (
+                                    <div key={sem.id} className="flex items-center justify-between p-2 rounded-xl bg-white/5">
+                                        <div className="flex-1 min-w-0">
+                                            <span className="text-sm block truncate">{sem.title + ' ' + sem.department_name}</span>
+                                        </div>
+                                        <div className="flex gap-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => setEditingSem(sem)}
+                                                className="p-1.5 rounded-lg hover:bg-white/10"
+                                            >
+                                                <FiEdit2 size={14} />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleEntityDelete('/catalog/semesters', sem.id)}
+                                                className="p-1.5 rounded-lg hover:bg-red-500/20"
+                                            >
+                                                <FiTrash2 size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                )) : semesters.map((sem) => (
                                     <div key={sem.id} className="flex items-center justify-between p-2 rounded-xl bg-white/5">
                                         <div className="flex-1 min-w-0">
                                             <span className="text-sm block truncate">{sem.title + ' ' + sem.department_name}</span>
@@ -722,6 +903,9 @@ const DetailEntities = () => {
                                         </div>
                                     </div>
                                 ))}
+                                {isSearching && searchSemesters.length === 0 && (
+                                    <p className="text-sm text-gray-400">No semesters found.</p>
+                                )}
                             </div>
                         </div>
                     )}

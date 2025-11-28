@@ -13,7 +13,7 @@ const MultiSelect = ({ label, options, value = [], onChange, ...props }) => {
           const selected = Array.from(e.target.selectedOptions, (option) => option.value);
           if (onChange) onChange(selected);
         }}
-        className="rounded-2xl bg-white/5 border border-white/10 px-4 py-3 text-white focus:border-brand-400 outline-none min-h-[100px]"
+        className="rounded-2xl bg-white/5 border border-white/10 px-4 py-3 text-white focus:border-brand-400 outline-none min-h-[100px] custom-scroll"
       >
         {options.map((option) => (
           <option key={option.id || option.value} value={option.id || option.value}>
