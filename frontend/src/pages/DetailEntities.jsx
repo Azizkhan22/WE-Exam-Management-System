@@ -8,13 +8,13 @@ import StatusMessage from '../components/StatusMessage';
 import Input from '../components/Input';
 import Select from '../components/Select';
 import MultiSelect from '../components/MultiSelect';
+import CSVDialog from '../components/CSVDialog';
 import { Link } from 'react-router-dom';
 
 
 const DetailEntities = () => {
-    const { user, logout } = useAuthStore();
 
-    // === States from your code ===
+
     const [departments, setDepartments] = useState([]);
     const [semesters, setSemesters] = useState([]);
     const [rooms, setRooms] = useState([]);
@@ -28,8 +28,9 @@ const DetailEntities = () => {
     const [searchStudents, setSearchStudents] = useState([]);
     const [isSearching, setIsSearching] = useState(false);
 
+    const [showCSVDialog, setShowCSVDialog] = useState(false);
+
     const [semesterCourses, setSemesterCourses] = useState([]);
-    const [studentCourses, setStudentCourses] = useState([]);
     const [editingDept, setEditingDept] = useState(null);
     const [editingSem, setEditingSem] = useState(null);
     const [editingRoom, setEditingRoom] = useState(null);
@@ -37,12 +38,11 @@ const DetailEntities = () => {
     const [editingCourse, setEditingCourse] = useState(null);
     const [semesterSelectedCourses, setsemesterSelectedCourses] = useState([]);
     const [courseFormData, setCourseFormData] = useState({ semesterId: '', examDate: '' });
-    const [studentFormData, setStudentFormData] = useState({ courseIds: [] });
     const [loading, setLoading] = useState(true);
     const [formStatus, setFormStatus] = useState('');
     const [showMessage, setShowMessage] = useState(false);
 
-    const [activeTab, setActiveTab] = useState('students'); // Tab switching
+    const [activeTab, setActiveTab] = useState('courses');
 
     const triggerMessage = () => setShowMessage(true);
 
@@ -56,16 +56,12 @@ const DetailEntities = () => {
                 apiClient.get('/catalog/rooms'),
                 apiClient.get('/catalog/courses'),
                 apiClient.get('/students'),
-                apiClient.get('/catalog/semester-courses').catch(() => ({ data: [] })),
-                apiClient.get('/catalog/student-courses').catch(() => ({ data: [] })),
             ]);
             setDepartments(deps.data);
             setSemesters(sems.data);
             setRooms(rms.data);
             setCourses(crs.data);
             setStudents(studs.data);
-            setSemesterCourses(semCoursesRes.data || []);
-            setStudentCourses(studCoursesRes.data || []);
         } catch (error) {
             console.error('Failed to load data', error);
         } finally {
@@ -164,6 +160,7 @@ const DetailEntities = () => {
                 duration={3000}
                 onClose={() => setShowMessage(false)}
             />
+            {showCSVDialog && <CSVDialog setShowCSVDialog={setShowCSVDialog} setFormStatus={setFormStatus} setShowMessage={setShowMessage} loadCoreData={loadCoreData} /> }
             <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
                 <div>
                     <p className="text-xs uppercase tracking-[0.5em] text-gray-400">Manage Entities</p>
@@ -172,19 +169,28 @@ const DetailEntities = () => {
                         <FiArrowLeft />
                         <Link to="/dashboard" className="ml-2 underline">Back to Dashboard</Link>
                     </div>
+                </div>               
+                <div className='flex gap-[8px]'>
+                    <button
+                        type="button"
+                        onClick={() => setShowCSVDialog(true)}
+                        className="px-5 py-3 rounded-2xl border border-white/10 bg-white/5 flex items-center gap-2"
+                    >
+                        Upload CSV
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => loadCoreData()}
+                        className="px-5 py-3 rounded-2xl border border-white/10 bg-white/5 flex items-center gap-2"
+                    >
+                        <FiRefreshCw /> Refresh data
+                    </button>
                 </div>
-                <button
-                    type="button"
-                    onClick={() => loadCoreData(activePlanId)}
-                    className="px-5 py-3 rounded-2xl border border-white/10 bg-white/5 flex items-center gap-2"
-                >
-                    <FiRefreshCw /> Refresh data
-                </button>
             </header>
             <div className="space-y-6">
                 {/* Tabs */}
                 <div className="flex flex-wrap sm:flex-nowrap gap-2 border-b border-white/10 pb-2 overflow-x-auto">
-                    {['students', 'rooms', 'departments', 'courses', 'semesters'].map((tab) => (
+                    {['courses', 'departments', 'semesters', 'rooms', 'students'].map((tab) => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
@@ -319,16 +325,11 @@ const DetailEntities = () => {
                                     onSubmit={async (e) => {
                                         e.preventDefault();
                                         const formData = new FormData(e.currentTarget);
-                                        const selectElement = e.target.querySelector('[name="studentCourses"]');
-                                        const courseIds = Array.from(selectElement.selectedOptions, (opt) => opt.value);
-
-                                        setStudentFormData({ courseIds });
 
                                         await handleEntityUpdate('/students', editingStudent.id, {
                                             fullName: formData.get('studentName'),
                                             rollNo: formData.get('studentRoll'),
                                             semesterId: Number(formData.get('studentSemester')),
-                                            seatPref: formData.get('seatPref'),
                                         });
 
                                         setEditingStudent(null);
@@ -345,15 +346,6 @@ const DetailEntities = () => {
                                             </option>
                                         ))}
                                     </Select>
-                                    <MultiSelect
-                                        label="Courses (select multiple)"
-                                        name="studentCourses"
-                                        options={courses}
-                                        value={studentCourses.filter(sc => sc.student_id === editingStudent.id).map(sc => String(sc.course_id))}
-                                        onChange={(selected) => {
-                                            // This will be handled by the form submission
-                                        }}
-                                    />
                                     <div className="flex justify-center items-center gap-2">
                                         <button type="submit" className="flex-1 py-2 rounded-2xl bg-brand-500/20 border border-brand-500/40 max-w-[200px]">
                                             Update
@@ -376,17 +368,11 @@ const DetailEntities = () => {
                                     onSubmit={async (e) => {
                                         e.preventDefault();
                                         const formData = new FormData(e.currentTarget);
-                                        const selectElement = e.target.querySelector('[name="studentCourses"]');
-                                        const courseIds = Array.from(selectElement.selectedOptions, (opt) => opt.value);
-
-                                        setStudentFormData({ courseIds });
 
                                         await handleEntityCreate('/students', {
                                             fullName: formData.get('studentName'),
                                             rollNo: formData.get('studentRoll'),
                                             semesterId: Number(formData.get('studentSemester')),
-                                            seatPref: formData.get('seatPref'),
-                                            courseIds: courseIds,
                                         });
 
                                         e.currentTarget.reset();
@@ -402,13 +388,6 @@ const DetailEntities = () => {
                                             </option>
                                         ))}
                                     </Select>
-                                    <MultiSelect
-                                        label="Courses (select multiple)"
-                                        name="studentCourses"
-                                        options={courses}
-                                        value={studentFormData.courseIds}
-                                        onChange={(selected) => setStudentFormData(prev => ({ ...prev, courseIds: selected }))}
-                                    />
                                     <div className='flex w-full justify-center items-center'>
                                         <button type="submit" className="w-full py-2 rounded-2xl bg-white/10 border border-white/10 max-w-[200px]">
                                             Save student
@@ -427,7 +406,8 @@ const DetailEntities = () => {
                                     <div key={student.id} className="flex items-center justify-between p-2 rounded-xl bg-white/5">
                                         <div className="flex-1 min-w-0">
                                             <span className="text-sm block truncate">{student.full_name}</span>
-                                            <span className="text-xs text-gray-500">{student.roll_no}</span>
+                                            <span className="text-xs text-gray-500 block">{student.roll_no}</span>
+                                            <span className="text-xs text-gray-500">{student.semester_title + " " + student.department_name}</span>
                                         </div>
                                         <div className="flex gap-1">
                                             <button
@@ -450,7 +430,8 @@ const DetailEntities = () => {
                                     <div key={student.id} className="flex items-center justify-between p-2 rounded-xl bg-white/5">
                                         <div className="flex-1 min-w-0">
                                             <span className="text-sm block truncate">{student.full_name}</span>
-                                            <span className="text-xs text-gray-500">{student.roll_no}</span>
+                                            <span className="text-xs text-gray-500 block">{student.roll_no}</span>
+                                            <span className="text-xs text-gray-500">{student.semester_title + " " + student.department_name}</span>
                                         </div>
                                         <div className="flex gap-1">
                                             <button
@@ -794,7 +775,7 @@ const DetailEntities = () => {
                                     </Select>
                                     <Input label="Semester title" name="semesterTitle" defaultValue={editingSem.title} required />
                                     <MultiSelect
-                                        label="Semester's Courses (For updation of courses select the all updated courses)"
+                                        label="Semester's Courses (For updation of courses select the new updated courses)"
                                         name="semesterCourses[]"
                                         options={courses}
                                         value={semesterSelectedCourses}

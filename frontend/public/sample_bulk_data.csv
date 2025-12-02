@@ -1,0 +1,14 @@
+type,name,department_name,title,code,exam_date,courses,semester_title,roll_no,full_name,seat_pref,capacity,rows,cols,invigilator_name
+department,Computer Science,,,,,,,,,,,,,
+department,Electrical Engineering,,,,,,,,,,,,,
+course,,,DSA,CS101,12/15/2025,,,,,,,,,
+course,,,Operating Systems,CS102,12/18/2025,,,,,,,,,
+course,,,Database Systems,CS103,12/20/2025,,,,,,,,,
+course,,,Linear Algebra,MTH101,12/16/2025,,,,,,,,,
+semester,,Computer Science,Fall 2025,,,"DSA,Operating Systems",,,,,,,,
+semester,,Electrical Engineering,Spring 2025,,,"DSA,Linear Algebra",,,,,,,,
+student,,,,,,,Fall 2025-Computer Science,101,Ali Khan,,,,,
+student,,,,,,,Fall 2025-Computer Science,102,Sara Ahmed,,,,,
+student,,,,,,,Spring 2025-Electrical Engineering,103,John Doe,,,,,
+room,R12,,,209,,,,,,,40,5,8,Mr. Ahmed
+room,R21,,,309,,,,,,,50,6,9,Ms. Fatima

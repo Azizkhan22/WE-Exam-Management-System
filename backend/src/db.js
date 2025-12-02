@@ -84,16 +84,8 @@ const initializeDatabase = async () => {
       semester_id INTEGER NOT NULL,
       roll_no TEXT NOT NULL UNIQUE,
       full_name TEXT NOT NULL,
-      seat_pref TEXT,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (semester_id) REFERENCES semesters(id) ON DELETE CASCADE
-    )`,
-    `CREATE TABLE IF NOT EXISTS student_courses (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      student_id INTEGER NOT NULL,
-      course_id INTEGER NOT NULL,      
-      FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
-      FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
     )`,
     `CREATE TABLE IF NOT EXISTS rooms (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

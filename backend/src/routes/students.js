@@ -25,7 +25,6 @@ router.get(
 
       const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
 
-      // Fetch students with semester and department info
       const students = await all(
         `SELECT s.*, sem.title AS semester_title, d.name AS department_name
          FROM students s
@@ -40,27 +39,13 @@ router.get(
         return res.json([]);
       }
 
-      // Fetch all student_courses for these students
-      const studentIds = students.map(s => s.id);
-      const placeholders = studentIds.map(() => '?').join(',');
-      const studentCourses = await all(
-        `SELECT student_id, course_id
-         FROM student_courses
-         WHERE student_id IN (${placeholders})`,
-        studentIds
-      );
 
-      // Map courseIds to each student
       const studentsWithCourses = students.map(student => {
-        const courses = studentCourses
-          .filter(sc => sc.student_id === student.id)
-          .map(sc => sc.course_id);
 
         return {
-          ...student,
-          courseIds: courses
+          ...student
         };
-      });      
+      });
       res.json(studentsWithCourses);
     } catch (error) {
       console.error('List students error', error);
@@ -75,32 +60,27 @@ router.post(
   authMiddleware(['admin']),
   async (req, res) => {
     try {
-      const { fullName, rollNo, semesterId, seatPref, courseIds = [] } = req.body;
+      const { fullName, rollNo, semesterId, } = req.body;
 
       const insert = await run(
-        `INSERT INTO students (semester_id, roll_no, full_name, seat_pref)
-         VALUES (?, ?, ?, ?)`,
-        [semesterId, rollNo, fullName, seatPref || null]
+        `INSERT INTO students (semester_id, roll_no, full_name)
+         VALUES (?, ?, ?)`,
+        [semesterId, rollNo, fullName]
       );
 
       const studentId = insert.lastID;
 
-      if (Array.isArray(courseIds) && courseIds.length > 0) {
-        await Promise.all(
-          courseIds.map((courseId) =>
-            run(
-              `INSERT INTO student_courses (student_id, course_id)
-               VALUES (?, ?)`,
-              [studentId, courseId]
-            )
-          )
-        );
-      }
+      const newStudent = await get(
+        `SELECT s.*, sem.title AS semester_title, d.name AS department_name
+        FROM students s
+        LEFT JOIN semesters sem ON s.semester_id = sem.id
+        LEFT JOIN departments d ON sem.department_id = d.id
+        WHERE s.id = ?`,
+        [studentId]
+      );
 
-      const newStudent = await get('SELECT * FROM students WHERE id = ?', [studentId]);
       const student = {
         ...newStudent,
-        courseIds: courseIds,
       };
       res.status(201).json({
         ...student

@@ -4,6 +4,7 @@ const catalogRoutes = require('./lookup');
 const studentRoutes = require('./students');
 const planRoutes = require('./plans');
 const searchRoutes = require('./search');
+const csvRoutes = require('./csv');
 
 const router = express.Router();
 
@@ -16,5 +17,6 @@ router.use('/courses', catalogRoutes);
 router.use('/semesters', catalogRoutes);
 router.use('/departments', catalogRoutes);
 router.use('/semester-courses', catalogRoutes);
+router.use('/import', csvRoutes);
 module.exports = router;
 
