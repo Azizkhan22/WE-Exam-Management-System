@@ -11,12 +11,8 @@ import Input from '../components/Input';
 import SeatGrid from '../components/SeatGrid';
 
 const AdminDashboard = () => {
-  const { user, logout } = useAuthStore();  
-  const [departments, setDepartments] = useState([]);
-  const [semesters, setSemesters] = useState([]);
+  const { user, logout } = useAuthStore();
   const [rooms, setRooms] = useState([]);
-  const [courses, setCourses] = useState([]);
-  const [students, setStudents] = useState([]);
   const [stats, setStats] = useState({ students: 0, rooms: 0, plans: 0 });
   const [plans, setPlans] = useState([]);
   const [planDetail, setPlanDetail] = useState(null);
@@ -26,10 +22,11 @@ const AdminDashboard = () => {
   const [swapSeat, setSwapSeat] = useState(null);
   const [activePlanId, setActivePlanId] = useState(null);
   const [activeRoomId, setActiveRoomId] = useState(null);
-  const [semesterCourses, setSemesterCourses] = useState([]);
-  const [studentCourses, setStudentCourses] = useState([]);
   const [showMessage, setShowMessage] = useState(false);
 
+  const activeRoom = planDetail?.rooms?.find((r) => r.roomId === activeRoomId);
+
+  console.log('Active Room:', activeRoom);
   // primaryForm repurposed for multi-room generation: planDate and selectedRooms
   const [primaryForm, setPrimaryForm] = useState({
     title: '',
@@ -50,11 +47,6 @@ const AdminDashboard = () => {
     setShowMessage(true);
   };
 
-  const activeRoom = useMemo(
-    () => roomsForPlan.find((room) => room.displayId === activeRoomId),
-    [roomsForPlan, activeRoomId]
-  );
-
   const activeAllocations = useMemo(() => {
     if (!planDetail || !activeRoomId) return [];
     return planDetail.allocations.filter((seat) => seat.room_id === activeRoomId);
@@ -64,32 +56,16 @@ const AdminDashboard = () => {
     setLoading(true);
     try {
       const [
-        deps,
-        sems,
         rms,
-        crs,
-        studs,
         statsRes,
-        plansRes,
-        semCoursesRes,
-        studCoursesRes,
+        plansRes
       ] = await Promise.all([
-        apiClient.get('/catalog/departments'),
-        apiClient.get('/catalog/semesters'),
         apiClient.get('/catalog/rooms'),
-        apiClient.get('/catalog/courses'),
-        apiClient.get('/students'),
         apiClient.get('/search/stats'),
         apiClient.get('/plans'),
-        apiClient.get('/catalog/semester-courses').catch(() => ({ data: [] })),
-        apiClient.get('/catalog/student-courses').catch(() => ({ data: [] })),
       ]);
 
-      setDepartments(deps.data);
-      setSemesters(sems.data);
       setRooms(rms.data);
-      setCourses(crs.data);
-      setStudents(studs.data);
 
       // statsRes might be an object — normalize to array or keep as object depending on backend
       try {
@@ -100,8 +76,7 @@ const AdminDashboard = () => {
       }
 
       setPlans(plansRes.data || []);
-      setSemesterCourses(semCoursesRes.data || []);
-      setStudentCourses(studCoursesRes.data || []);
+
 
       if (plansRes.data && plansRes.data.length) {
         const nextPlanId =
@@ -256,8 +231,10 @@ const AdminDashboard = () => {
 
   // ---- NEW: generate seating plans for multiple rooms for selected date
   const handleMultiGenerate = async (e) => {
-    e && e.preventDefault && e.preventDefault();
-    const { planDate, selectedRooms } = primaryForm;
+    e?.preventDefault?.();
+    const { planDate, selectedRooms, title } = primaryForm;
+
+    // Validation
     if (!planDate) {
       setFormStatus('Pick an exam date first');
       trigger();
@@ -270,32 +247,37 @@ const AdminDashboard = () => {
     }
 
     setPlanLoading(true);
+
     try {
-      // NOTE: endpoint '/plans/bulk' is used here as an example.
-      // If your backend expects '/plans' with a special payload, change accordingly.
+      // Prepare payload for new backend
       const payload = {
-        title: primaryForm.title || `Seating plans • ${dayjs(planDate).format('MMM D, YYYY')}`,
+        title: title || `Seating plans • ${dayjs(planDate).format('MMM D, YYYY')}`,
         planDate,
-        createdBy: user?.fullName || 'Admin',
         roomIds: selectedRooms.map(Number),
       };
 
+      // POST to backend
       const { data } = await apiClient.post('/plans/bulk', payload);
 
-      // Expect backend to return created plans (array) or a single object with createdPlanIds
-      // We'll attempt to pick the first created plan to load into the viewer.
-      let firstPlanId = null;
-      if (Array.isArray(data) && data.length) firstPlanId = data[0].id || data[0].plan?.id;
-      if (!firstPlanId && data.id) firstPlanId = data.id;
+      // Backend returns single plan object
+      const createdPlan = data.plan;
 
-      setPrimaryForm((prev) => ({ ...prev, title: '' }));
+      // Reset form
+      setPrimaryForm((prev) => ({ ...prev, title: '', selectedRooms: [] }));
       setSwapSeat(null);
-      setFormStatus('Seating plans generated ✦');
+      setFormStatus(data.message || 'Seating plans generated ✦');
       trigger();
 
-      // Refresh dashboard data and select first created plan if possible
-      await loadCoreData(firstPlanId || null);
-      if (firstPlanId) setActivePlanId(firstPlanId);
+      // Update plan viewer and dashboard
+      setPlanDetail({
+        plan: createdPlan,
+        rooms: data.rooms,
+        seatsAllocated: data.seatsAllocated,
+      });
+      setActivePlanId(createdPlan.id);
+
+      // Optional: reload core data if needed
+      await loadCoreData(createdPlan.id);
     } catch (error) {
       console.error('Multi-generate failed', error);
       setFormStatus(error.response?.data?.message || 'Failed to generate plans');
@@ -305,6 +287,7 @@ const AdminDashboard = () => {
     }
   };
 
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center text-white">
@@ -312,7 +295,7 @@ const AdminDashboard = () => {
       </div>
     );
   }
-
+  console.log(planDetail);
   return (
     <div className="min-h-screen px-6 md:px-10 py-10 text-white space-y-10">
       <StatusMessage
@@ -357,14 +340,14 @@ const AdminDashboard = () => {
 
       <section className="glass p-6 border border-white/10 space-y-6">
         <div className="flex flex-col xl:flex-row gap-8">
-          {/* ---- LEFT: Multi-room orchestration (REPLACED) ---- */}
+          {/* ---- LEFT: Multi-room orchestration ---- */}
           <div className="xl:w-1/3 space-y-5">
             <div>
               <p className="text-xs uppercase tracking-[0.4em] text-gray-400">Engine</p>
               <h2 className="text-3xl font-display">Multi-room orchestration</h2>
               <p className="text-gray-400">
                 Pick a date, select one or more rooms, then generate seating plans for all chosen rooms at once.
-                The backend will create plans per room and the frontend will let you browse each room's grid.
+                The backend will create the seating plan and allocate students automatically.
               </p>
             </div>
 
@@ -373,7 +356,9 @@ const AdminDashboard = () => {
                 label="Exam date"
                 type="date"
                 value={primaryForm.planDate}
-                onChange={(e) => setPrimaryForm((prev) => ({ ...prev, planDate: e.target.value }))}
+                onChange={(e) =>
+                  setPrimaryForm((prev) => ({ ...prev, planDate: e.target.value }))
+                }
                 required
               />
 
@@ -387,16 +372,17 @@ const AdminDashboard = () => {
                         key={room.id}
                         type="button"
                         onClick={() => toggleRoomSelection(room.id)}
-                        className={`text-sm px-3 py-2 rounded-2xl border transition text-left ${
-                          isSelected
-                            ? 'border-brand-500 bg-brand-500/10'
-                            : 'border-white/10 bg-white/5 hover:border-white/30'
-                        }`}
+                        className={`text-sm px-3 py-2 rounded-2xl border transition text-left ${isSelected
+                          ? 'border-brand-500 bg-brand-500/10'
+                          : 'border-white/10 bg-white/5 hover:border-white/30'
+                          }`}
                       >
                         <div className="flex items-center justify-between gap-2">
                           <div>
                             <div className="font-medium">{room.name}</div>
-                            <div className="text-xs text-gray-400">{room.code} • {room.capacity} seats</div>
+                            <div className="text-xs text-gray-400">
+                              {room.code} • {room.capacity} seats
+                            </div>
                           </div>
                           <div className="text-xs">{isSelected ? '✓' : ''}</div>
                         </div>
@@ -409,7 +395,9 @@ const AdminDashboard = () => {
               <Input
                 label="Optional plan title (applies to all generated plans)"
                 value={primaryForm.title}
-                onChange={(e) => setPrimaryForm((prev) => ({ ...prev, title: e.target.value }))}
+                onChange={(e) =>
+                  setPrimaryForm((prev) => ({ ...prev, title: e.target.value }))
+                }
                 placeholder="Optional friendly label"
               />
 
@@ -418,7 +406,7 @@ const AdminDashboard = () => {
                   type="submit"
                   className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-brand-500 to-accent font-medium"
                 >
-                  Generate seating plans
+                  Generate seating plan
                 </button>
                 <button
                   type="button"
@@ -452,13 +440,15 @@ const AdminDashboard = () => {
                   </button>
                 ))}
                 {!plans.length && (
-                  <p className="text-sm text-gray-500">No saved plans yet. Generate your first one!</p>
+                  <p className="text-sm text-gray-500">
+                    No saved plans yet. Generate your first one!
+                  </p>
                 )}
               </div>
             </div>
           </div>
 
-          {/* ---- RIGHT: Plan viewer (unchanged) ---- */}
+          {/* ---- RIGHT: Plan viewer ---- */}
           <div className="flex-1 space-y-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
@@ -468,7 +458,7 @@ const AdminDashboard = () => {
                 </h3>
                 {planDetail && (
                   <p className="text-sm text-gray-400">
-                    {planDetail.plan.plan_date} • crafted by {planDetail.plan.created_by}
+                    {planDetail.plan.plan_date} • crafted by {planDetail.plan.created_by || 'Admin'}
                   </p>
                 )}
               </div>
@@ -485,14 +475,14 @@ const AdminDashboard = () => {
 
             {planDetail ? (
               <>
-                {roomsForPlan.length > 1 && (
+                {planDetail.rooms.length > 0 && (
                   <div className="flex flex-wrap gap-2">
-                    {roomsForPlan.map((room) => (
+                    {planDetail.rooms.map((room) => (
                       <button
-                        key={room.displayId}
+                        key={room.roomId}
                         type="button"
-                        onClick={() => handleRoomSwitch(room.displayId)}
-                        className={`px-3 py-2 rounded-2xl border text-sm ${activeRoomId === room.displayId
+                        onClick={() => setActiveRoomId(room.roomId)}
+                        className={`px-3 py-2 rounded-2xl border text-sm ${activeRoomId === room.roomId
                           ? 'border-brand-500 bg-brand-500/10'
                           : 'border-white/10 bg-white/5'
                           }`}
@@ -512,14 +502,16 @@ const AdminDashboard = () => {
 
                 {activeRoom ? (
                   <SeatGrid
-                    room={{ ...activeRoom, id: activeRoom.displayId }}
-                    allocations={activeAllocations}
+                    room={activeRoom}
+                    allocations={planDetail.allocations}
                     onSeatPick={handleSeatPick}
                     selectedSeat={swapSeat}
                   />
                 ) : (
-                  <p className="text-gray-400">Select a room tab above to view its live arrangement.</p>
+                  <p className="text-gray-400">Select a room tab above to view its seating grid.</p>
                 )}
+
+
               </>
             ) : (
               <div className="rounded-3xl border border-dashed border-white/10 p-6 text-gray-400">
@@ -529,6 +521,7 @@ const AdminDashboard = () => {
           </div>
         </div>
       </section>
+
     </div>
   );
 };

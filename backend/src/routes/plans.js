@@ -2,11 +2,7 @@ const express = require('express');
 const dayjs = require('dayjs');
 const { authMiddleware } = require('../middleware/auth');
 const { run, all, get } = require('../db');
-const {
-  fetchStudentsBySemesters,
-  computeSeatGrid,
-  allocateSeatsRoundRobin,
-} = require('../services/allocationService');
+const { allocateForPlanBulk } = require('../services/allocationService');
 
 const router = express.Router();
 
@@ -41,9 +37,12 @@ router.get('/:id', async (req, res) => {
 
     const rooms = await all(
       `SELECT pr.room_id, r.*
-       FROM plan_rooms pr
-       JOIN rooms r ON r.id = pr.room_id
-       WHERE pr.plan_id = ?`,
+FROM plan_rooms pr
+JOIN rooms r ON r.id = pr.room_id
+JOIN allocated_seats a ON a.room_id = pr.room_id AND a.plan_id = pr.plan_id
+WHERE pr.plan_id = ?
+GROUP BY pr.room_id
+`,
       [plan.id]
     );
 
@@ -226,6 +225,101 @@ router.get('/:id/export', authMiddleware(), async (req, res) => {
     res.status(500).json({ message: 'Failed to export plan' });
   }
 });
+
+router.post('/bulk', authMiddleware(), async (req, res) => {
+  const { title, planDate, roomIds = [] } = req.body;
+  if (!planDate || !Array.isArray(roomIds) || !roomIds.length) {
+    return res.status(400).json({ message: 'Missing planDate or roomIds' });
+  }
+
+  try {
+    const parsedDate = dayjs(planDate).format('YYYY-MM-DD');
+
+    await run('BEGIN IMMEDIATE TRANSACTION');
+
+    // create plan
+    const planInsert = await run(
+      `INSERT INTO seating_plans (title, plan_date)
+        VALUES (?, ?)`,
+      [title || `Seating plan • ${parsedDate}`, parsedDate]
+    );
+    const planId = planInsert.lastID;
+
+    // fetch room metadata and link rooms
+    const roomsRows = [];
+    for (const rId of roomIds) {
+      const r = await get('SELECT * FROM rooms WHERE id = ?', [rId]);
+      if (!r) {
+        await run('ROLLBACK').catch(() => { });
+        return res.status(400).json({ message: `Invalid room id ${rId}` });
+      }
+      roomsRows.push(r);
+      await run('INSERT INTO plan_rooms (plan_id, room_id) VALUES (?, ?)', [planId, rId]);
+    }
+
+    // allocate students automatically
+    const { placedRecords, seatsAllocated } = await allocateForPlanBulk({ planId, rooms: roomsRows });
+
+    // persist allocations
+    if (placedRecords.length) {
+      await Promise.all(
+        placedRecords.map((p) =>
+          run(
+            `INSERT INTO allocated_seats (plan_id, room_id, seat_row, seat_col, student_id)
+             VALUES (?, ?, ?, ?, ?)`,
+            [planId, p.roomId, p.seatRow, p.seatCol, p.studentId || null]
+          )
+        )
+      );
+    }
+
+    await run('COMMIT');
+
+    // prepare response like export
+    const allocations = await all(
+      `SELECT a.*, s.full_name, s.roll_no, sem.title as semester_title,
+              d.name as department_name, r.code as room_code, r.name as room_name, r.invigilator_name, r.rows, r.cols
+       FROM allocated_seats a
+       LEFT JOIN students s ON s.id = a.student_id
+       LEFT JOIN semesters sem ON sem.id = s.semester_id
+       LEFT JOIN departments d ON d.id = sem.department_id
+       LEFT JOIN rooms r ON r.id = a.room_id
+       WHERE a.plan_id = ?
+       ORDER BY r.name, a.seat_row, a.seat_col`,
+      [planId]
+    );
+
+    const grouped = allocations.reduce((acc, seat) => {
+      if (!acc[seat.room_id]) {
+        acc[seat.room_id] = {
+          roomId: seat.room_id,
+          roomCode: seat.room_code,
+          roomName: seat.room_name,
+          invigilator: seat.invigilator_name,
+          rows: seat.rows,
+          cols: seat.cols,
+          seats: [],
+        };
+      }
+      acc[seat.room_id].seats.push(seat);
+      return acc;
+    }, {});
+
+    const planRecord = await get('SELECT * FROM seating_plans WHERE id = ?', [planId]);
+
+    res.status(201).json({
+      plan: planRecord,
+      rooms: Object.values(grouped),
+      seatsAllocated,
+      message: 'Seating plans generated automatically',
+    });
+  } catch (err) {
+    console.error('Bulk plan generation error', err);
+    await run('ROLLBACK').catch(() => { });
+    res.status(500).json({ message: 'Failed to generate seating plans' });
+  }
+});
+
 
 module.exports = router;
 

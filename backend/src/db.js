@@ -101,8 +101,6 @@ const initializeDatabase = async () => {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL,
       plan_date TEXT NOT NULL,
-      created_by TEXT NOT NULL,
-      status TEXT DEFAULT 'draft',
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )`,
     `CREATE TABLE IF NOT EXISTS plan_semesters (
@@ -120,17 +118,18 @@ const initializeDatabase = async () => {
       FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE
     )`,
     `CREATE TABLE IF NOT EXISTS allocated_seats (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      plan_id INTEGER NOT NULL,
-      room_id INTEGER NOT NULL,
-      seat_row INTEGER NOT NULL,
-      seat_col INTEGER NOT NULL,
-      student_id INTEGER NOT NULL,
-      UNIQUE (plan_id, room_id, seat_row, seat_col),
-      FOREIGN KEY (plan_id) REFERENCES seating_plans(id) ON DELETE CASCADE,
-      FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE,
-      FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
-    )`,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  plan_id INTEGER NOT NULL,
+  room_id INTEGER NOT NULL,
+  seat_row INTEGER NOT NULL,
+  seat_col INTEGER NOT NULL,
+  student_id INTEGER,
+  UNIQUE (plan_id, room_id, seat_row, seat_col),
+  FOREIGN KEY (plan_id) REFERENCES seating_plans(id) ON DELETE CASCADE,
+  FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE,
+  FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+)`,
+
     `CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       full_name TEXT NOT NULL,

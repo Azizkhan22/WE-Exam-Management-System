@@ -1,6 +1,7 @@
+import { useMemo } from "react";
 
 const SeatGrid = ({ room, allocations, onSeatPick, selectedSeat }) => {
-  const roomId = room.room_id || room.id;
+  const roomId = room.room_id;
   const rows = Number(room.rows) || 0;
   const cols = Number(room.cols) || 0;
   const capacity = Number(room.capacity) || rows * cols;
@@ -10,8 +11,8 @@ const SeatGrid = ({ room, allocations, onSeatPick, selectedSeat }) => {
       map[`${seat.seat_row}-${seat.seat_col}`] = seat;
     });
     return map;
-  }, [allocations]);
-
+  }, [allocations]);  
+  console.log(allocations);
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
