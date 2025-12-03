@@ -10,7 +10,6 @@ const {
 
 const router = express.Router();
 
-const buildInClause = (items = []) => items.map(() => '?').join(',');
 
 router.get('/', authMiddleware(), async (_req, res) => {
   try {
