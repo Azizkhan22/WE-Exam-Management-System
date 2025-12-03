@@ -11,8 +11,8 @@ const SeatGrid = ({ room, allocations, onSeatPick, selectedSeat }) => {
       map[`${seat.seat_row}-${seat.seat_col}`] = seat;
     });
     return map;
-  }, [allocations]);  
-  console.log(allocations);
+  }, [allocations]);
+  console.log('aziz', allocations);
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -27,10 +27,13 @@ const SeatGrid = ({ room, allocations, onSeatPick, selectedSeat }) => {
           Capacity {capacity} • Grid {rows}x{cols}
         </div>
       </div>
-      <div className="rounded-3xl border border-white/10 p-4 bg-white/5">
+      <div className="rounded-3xl border border-white/10 p-4 bg-white/5 overflow-x-auto max-w-[800px] custom-scroll">
         <div
           className="grid gap-2"
-          style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+          style={{
+            gridTemplateColumns: `repeat(${cols}, minmax(80px, 1fr))`, // min width for buttons
+            minWidth: `${cols * 80}px`, // ensure container scrolls if cols exceed width
+          }}
         >
           {Array.from({ length: rows }).map((_, rowIndex) =>
             Array.from({ length: cols }).map((_, colIndex) => {
@@ -47,10 +50,13 @@ const SeatGrid = ({ room, allocations, onSeatPick, selectedSeat }) => {
                 <button
                   key={key}
                   type="button"
-                  onClick={() => seat && onSeatPick({ ...seat, room_id: roomId, room_name: room.name })}
-                  className={`rounded-2xl px-3 py-2 text-left border text-xs transition ${seat
-                    ? 'bg-brand-500/10 border-brand-500/40 text-white hover:bg-brand-500/20'
-                    : 'bg-white/5 border-white/10 text-gray-500 cursor-not-allowed'
+                  onClick={() =>
+                    seat &&
+                    onSeatPick({ ...seat, room_id: roomId, room_name: room.name })
+                  }
+                  className={`rounded-2xl px-3 py-2 text-left border text-xs transition min-w-[80px] ${seat
+                      ? 'bg-brand-500/10 border-brand-500/40 text-white hover:bg-brand-500/20'
+                      : 'bg-white/5 border-white/10 text-gray-500 cursor-not-allowed'
                     } ${isSelected ? 'ring-2 ring-accent' : ''}`}
                 >
                   {seat ? (
@@ -77,6 +83,7 @@ const SeatGrid = ({ room, allocations, onSeatPick, selectedSeat }) => {
           atomic updates.
         </p>
       </div>
+
     </div>
   );
 };

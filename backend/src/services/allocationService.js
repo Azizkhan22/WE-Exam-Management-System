@@ -34,10 +34,9 @@ const computeSeatGrid = (room) => {
 };
 
 // Allocate students to rooms following adjacency rule
-const allocateSeatsForRooms = (students, rooms) => {
+const allocateSeatsForRooms = (students, rooms, alreadyAllocatedSeats = new Set()) => {
   const allocated = [];
-  const remainingStudents = [...students]; // clone
-  const globalOccupied = new Set();
+  const remainingStudents = [...students];
 
   const seatKey = (roomId, row, col) => `${roomId}:${row}:${col}`;
 
@@ -49,7 +48,6 @@ const allocateSeatsForRooms = (students, rooms) => {
     for (const [dr, dc] of directions) {
       const r = row + dr;
       const c = col + dc;
-      const key = seatKey(roomId, r, c);
       const p = placed.find(p => p.roomId === roomId && p.seatRow === r && p.seatCol === c);
       if (p && p.department_id === student.department_id) return true;
     }
@@ -57,20 +55,41 @@ const allocateSeatsForRooms = (students, rooms) => {
   };
 
   for (const room of rooms) {
-    const seatGrid = computeSeatGrid(room);
-    for (const seat of seatGrid) {
-      let assigned = false;
-      shuffle(remainingStudents).some((student, idx) => {
-        if (!isConflict(seat.roomId, seat.seatRow, seat.seatCol, student, allocated)) {
-          allocated.push({ ...seat, studentId: student.id, department_id: student.department_id, semester_id: student.semester_id });
-          remainingStudents.splice(idx, 1); // remove assigned
-          assigned = true;
-          return true;
+    for (let r = 1; r <= room.rows; r++) {
+      for (let c = 1; c <= room.cols; c++) {
+        const key = seatKey(room.id, r, c);
+        if (alreadyAllocatedSeats.has(key)) continue; // skip DB or previous allocation
+
+        let assigned = false;
+        shuffle(remainingStudents).some((student, idx) => {
+          if (!isConflict(room.id, r, c, student, allocated)) {
+            allocated.push({
+              roomId: room.id,
+              seatRow: r,
+              seatCol: c,
+              studentId: student.id,
+              department_id: student.department_id,
+              semester_id: student.semester_id,
+            });
+            remainingStudents.splice(idx, 1);
+            alreadyAllocatedSeats.add(key);
+            assigned = true;
+            return true;
+          }
+          return false;
+        });
+
+        if (!assigned) {
+          allocated.push({
+            roomId: room.id,
+            seatRow: r,
+            seatCol: c,
+            studentId: null,
+          });
+          alreadyAllocatedSeats.add(key);
         }
-        return false;
-      });
-      if (!assigned) {
-        allocated.push({ ...seat, studentId: null }); // leave empty
+
+        if (!remainingStudents.length) break;
       }
       if (!remainingStudents.length) break;
     }
@@ -82,18 +101,25 @@ const allocateSeatsForRooms = (students, rooms) => {
 
 // Main service function for bulk plan
 const allocateForPlanBulk = async ({ planId, rooms }) => {
-  // Fetch all semesters
+  // Get all semesters
   const semesters = await all(`SELECT id FROM semesters ORDER BY id ASC`);
   const semesterIds = semesters.map(s => s.id);
 
-  // Fetch students already allocated for this plan
+  // Students already allocated
   const existingAllocations = await all(
-    `SELECT student_id FROM allocated_seats WHERE plan_id = ? AND student_id IS NOT NULL`,
+    `SELECT student_id, room_id, seat_row, seat_col FROM allocated_seats WHERE plan_id = ?`,
     [planId]
   );
-  const alreadyAllocatedIds = new Set(existingAllocations.map(s => s.student_id));
 
-  const batchSize = 2; // allocate in batches of 2 semesters
+  const alreadyAllocatedStudents = new Set(
+    existingAllocations.filter(a => a.student_id).map(a => a.student_id)
+  );
+
+  const alreadyAllocatedSeats = new Set(
+    existingAllocations.map(a => `${a.room_id}:${a.seat_row}:${a.seat_col}`)
+  );
+
+  const batchSize = 2;
   let placedRecords = [];
   let seatsAllocated = 0;
 
@@ -101,21 +127,22 @@ const allocateForPlanBulk = async ({ planId, rooms }) => {
     const batch = semesterIds.slice(i, i + batchSize);
     let students = await fetchStudentsBySemesters(batch);
 
-    // Filter out students already allocated
-    students = students.filter(s => !alreadyAllocatedIds.has(s.id));
+    // Filter already allocated students
+    students = students.filter(s => !alreadyAllocatedStudents.has(s.id));
     if (!students.length) continue;
 
-    const batchAlloc = allocateSeatsForRooms(students, rooms);
+    const batchAlloc = allocateSeatsForRooms(students, rooms, alreadyAllocatedSeats);
+
+    batchAlloc.forEach(s => {
+      if (s.studentId) alreadyAllocatedStudents.add(s.studentId);
+    });
+
     placedRecords = placedRecords.concat(batchAlloc);
     seatsAllocated += students.length;
-
-    // Add newly allocated student IDs to the set to prevent duplicates
-    batchAlloc.forEach(s => {
-      if (s.studentId) alreadyAllocatedIds.add(s.studentId);
-    });
   }
 
   return { placedRecords, seatsAllocated };
 };
+
 
 module.exports = { allocateForPlanBulk };

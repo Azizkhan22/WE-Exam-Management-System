@@ -261,17 +261,29 @@ router.post('/bulk', authMiddleware(), async (req, res) => {
     const { placedRecords, seatsAllocated } = await allocateForPlanBulk({ planId, rooms: roomsRows });
 
     // persist allocations
+    // fetch existing seats for this plan
+    const existingSeats = await all(
+      `SELECT room_id, seat_row, seat_col FROM allocated_seats WHERE plan_id = ?`,
+      [planId]
+    );
+    const existingKeys = new Set(
+      existingSeats.map(s => `${s.room_id}:${s.seat_row}:${s.seat_col}`)
+    );
+
     if (placedRecords.length) {
       await Promise.all(
-        placedRecords.map((p) =>
-          run(
-            `INSERT INTO allocated_seats (plan_id, room_id, seat_row, seat_col, student_id)
-             VALUES (?, ?, ?, ?, ?)`,
-            [planId, p.roomId, p.seatRow, p.seatCol, p.studentId || null]
+        placedRecords
+          .filter(p => !existingKeys.has(`${p.roomId}:${p.seatRow}:${p.seatCol}`))
+          .map(p =>
+            run(
+              `INSERT INTO allocated_seats (plan_id, room_id, seat_row, seat_col, student_id)
+           VALUES (?, ?, ?, ?, ?)`,
+              [planId, p.roomId, p.seatRow, p.seatCol, p.studentId || null]
+            )
           )
-        )
       );
     }
+
 
     await run('COMMIT');
 
