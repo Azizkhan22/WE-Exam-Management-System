@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import apiClient from '../services/api';
 import { useAuthStore } from '../store/authStore';
 
+
 const AuthPage = () => {
   const navigate = useNavigate();
   const [semesters, setSemesters] = useState([]);
@@ -59,8 +60,17 @@ const AuthPage = () => {
   };
 
   return (
+    <div>
+      <button
+          onClick={() => navigate('/')} // <-- navigate to home
+          className="px-6 py-3 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition fixed top-4 left-4 z-50"
+        >
+          Back to Home
+        </button>
     <div className="min-h-screen text-white px-6 md:px-12 py-12">
+       
       <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-8 items-stretch">
+       
         <div className="glass p-8 space-y-6 border border-white/10">
           <div>
             <p className="text-xs uppercase tracking-[0.4em] text-gray-400">Portal access</p>
@@ -140,6 +150,7 @@ const AuthPage = () => {
           </div>
         </div>
       </div>
+    </div>
     </div>
   );
 };

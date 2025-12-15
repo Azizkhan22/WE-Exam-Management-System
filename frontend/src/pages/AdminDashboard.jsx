@@ -24,7 +24,10 @@ const AdminDashboard = () => {
   const [activeRoomId, setActiveRoomId] = useState(null);
   const [showMessage, setShowMessage] = useState(false);
 
-  const activeRoom = planDetail?.rooms?.find((r) => r.room_id === activeRoomId);
+  const activeRoom = planDetail?.rooms?.find(
+    (r) => Number(r.room_id ?? r.id) === Number(activeRoomId)
+  );
+  
 
   console.log('Active Room:', activeRoom);
   // primaryForm repurposed for multi-room generation: planDate and selectedRooms
@@ -49,7 +52,10 @@ const AdminDashboard = () => {
 
   const activeAllocations = useMemo(() => {
     if (!planDetail || !activeRoomId) return [];
-    return planDetail.allocations.filter((seat) => seat.room_id === activeRoomId);
+    return planDetail?.allocations?.filter(
+      (seat) => Number(seat.room_id) === Number(activeRoomId)
+    ) || [];
+    
   }, [planDetail, activeRoomId]);
 
   const loadCoreData = async (preferredPlanId = null) => {
@@ -159,63 +165,166 @@ const AdminDashboard = () => {
     setSwapSeat(null);
   };
 
+  // const handleExportPdf = async () => {
+  //   if (!planDetail?.plan?.id) return;
+  //   try {
+  //     const { data } = await apiClient.get(`/plans/${planDetail.plan.id}/export`);
+  //     const doc = new jsPDF({ orientation: 'landscape' });
+  //     data.rooms.forEach((room, index) => {
+  //       if (index !== 0) doc.addPage();
+  //       doc.setFontSize(20);
+  //       doc.text(`${planDetail.plan.title} — ${room.roomName}`, 14, 20);
+  //       doc.setFontSize(12);
+  //       doc.text(`Invigilator: ${room.invigilator || 'TBA'}`, 14, 30);
+  //       doc.text(`Grid: ${room.rows} x ${room.cols}`, 180, 30);
+  //       const seats = room.seats.sort(
+  //         (a, b) => a.seat_row - b.seat_row || a.seat_col - b.seat_col
+  //       );
+  //       let y = 40;
+  //       seats.forEach((seat) => {
+  //         doc.text(
+  //           `${seat.seat_row}-${seat.seat_col}  ${seat.roll_no}  ${seat.full_name}`,
+  //           14,
+  //           y
+  //         );
+  //         y += 7;
+  //         if (y > 190) {
+  //           doc.addPage();
+  //           y = 20;
+  //         }
+  //       });
+  //     });
+
+  //     doc.addPage();
+  //     doc.setFontSize(18);
+  //     doc.text('Consolidated Pack', 14, 20);
+  //     let y = 30;
+  //     const allSeats = planDetail.allocations.sort(
+  //       (a, b) => a.room_id - b.room_id || a.seat_row - b.seat_row
+  //     );
+  //     allSeats.forEach((seat) => {
+  //       doc.text(
+  //         `${seat.room_name} • ${seat.seat_row}-${seat.seat_col} • ${seat.roll_no} • ${seat.full_name}`,
+  //         14,
+  //         y
+  //       );
+  //       y += 7;
+  //       if (y > 190) {
+  //         doc.addPage();
+  //         y = 20;
+  //       }
+  //     });
+
+  //     doc.save(`${planDetail.plan.title}.pdf`);
+  //   } catch (error) {
+  //     setFormStatus('Failed to export PDF');
+  //     trigger();
+  //   }
+  // };
   const handleExportPdf = async () => {
     if (!planDetail?.plan?.id) return;
+  
     try {
       const { data } = await apiClient.get(`/plans/${planDetail.plan.id}/export`);
-      const doc = new jsPDF({ orientation: 'landscape' });
-      data.rooms.forEach((room, index) => {
-        if (index !== 0) doc.addPage();
-        doc.setFontSize(20);
-        doc.text(`${planDetail.plan.title} — ${room.roomName}`, 14, 20);
-        doc.setFontSize(12);
-        doc.text(`Invigilator: ${room.invigilator || 'TBA'}`, 14, 30);
-        doc.text(`Grid: ${room.rows} x ${room.cols}`, 180, 30);
-        const seats = room.seats.sort(
-          (a, b) => a.seat_row - b.seat_row || a.seat_col - b.seat_col
-        );
-        let y = 40;
-        seats.forEach((seat) => {
-          doc.text(
-            `${seat.seat_row}-${seat.seat_col}  ${seat.roll_no}  ${seat.full_name}`,
-            14,
-            y
-          );
-          y += 7;
-          if (y > 190) {
-            doc.addPage();
-            y = 20;
-          }
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm' });
+  
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 14;
+      const headerHeight = 30;
+      const bottomMargin = 15;
+  
+      const cellWidth = 25; // fixed width
+      const cellHeight = 20; // fixed height
+      const extraLeft = 10; // space for row numbers
+  
+      data.rooms.forEach((room, roomIndex) => {
+        if (roomIndex !== 0) doc.addPage();
+  
+        const seats = room.seats || [];
+        const seatMap = {};
+        seats.forEach((s) => {
+          seatMap[`${s.seat_row}-${s.seat_col}`] = s;
         });
-      });
+  
+        // Skip fully empty rows at the end
+        let maxRow = room.rows;
+        for (let r = room.rows; r >= 1; r--) {
+          const hasSeat = seats.some((s) => s.seat_row === r);
+          if (hasSeat) break;
+          maxRow--;
+        }
+  
+        const maxColsPerPage = Math.floor((pageWidth - margin * 2 - extraLeft) / cellWidth);
+  const maxRowsPerPage = Math.floor((pageHeight - headerHeight - bottomMargin) / cellHeight);
 
-      doc.addPage();
-      doc.setFontSize(18);
-      doc.text('Consolidated Pack', 14, 20);
-      let y = 30;
-      const allSeats = planDetail.allocations.sort(
-        (a, b) => a.room_id - b.room_id || a.seat_row - b.seat_row
-      );
-      allSeats.forEach((seat) => {
-        doc.text(
-          `${seat.room_name} • ${seat.seat_row}-${seat.seat_col} • ${seat.roll_no} • ${seat.full_name}`,
-          14,
-          y
-        );
-        y += 7;
-        if (y > 190) {
-          doc.addPage();
-          y = 20;
+        let rowStart = 1;
+        let isFirstSlice = true;
+        while (rowStart <= maxRow) {
+          
+          const rowEnd = Math.min(rowStart + maxRowsPerPage - 1, maxRow);
+  
+          let colStart = 1;
+          while (colStart <= room.cols) {
+            const colEnd = Math.min(colStart + maxColsPerPage - 1, room.cols);
+            // Only add page if it's NOT the first slice
+      if (!isFirstSlice) doc.addPage();
+            
+  
+            // Header
+            doc.setFontSize(16);
+            doc.text(`${planDetail.plan.title} — ${room.roomName}`, pageWidth / 2, 15, { align: 'center' });
+            doc.setFontSize(10);
+            doc.text(`Invigilator: ${room.invigilator || 'TBA'}`, margin, 25);
+            doc.text(`Room Code: ${room.roomCode || '-'}`, margin + 100, 25);
+            
+            const gridOffsetY = 10; // push the grid down a bit more
+            // Column numbers
+            doc.setFontSize(8);
+            for (let c = colStart; c <= colEnd; c++) {
+              const x = margin + extraLeft + (c - colStart) * cellWidth + cellWidth / 2;
+              const y = headerHeight + gridOffsetY - 3; // adjust column numbers down
+              doc.text(`${c}`, x, y, { align: 'center' });
+            }
+  
+            // Draw grid
+            for (let r = rowStart; r <= rowEnd; r++) {
+              const y = headerHeight + gridOffsetY + (r - rowStart) * cellHeight; // start grid lower;
+              // Row number
+              doc.text(`${r}`, margin + 4, y + cellHeight / 2 + 3);
+  
+              for (let c = colStart; c <= colEnd; c++) {
+                const x = margin + extraLeft + (c - colStart) * cellWidth;
+                doc.rect(x, y, cellWidth, cellHeight);
+  
+                const seat = seatMap[`${r}-${c}`];
+                if (seat) {
+                  doc.setFontSize(7);
+                  doc.text(seat.roll_no || '', x + cellWidth / 2, y + 7, { align: 'center' });
+                  doc.text(seat.full_name?.slice(0, 12) || '', x + cellWidth / 2, y + 14, { align: 'center' });
+                  doc.setFontSize(8);
+                }
+              }
+            }
+  
+            colStart = colEnd + 1; // move to next horizontal page
+            isFirstSlice = false;
+          }
+  
+          rowStart = rowEnd + 1; // move to next vertical slice
+          isFirstSlice = false;
         }
       });
-
+  
       doc.save(`${planDetail.plan.title}.pdf`);
     } catch (error) {
-      setFormStatus('Failed to export PDF');
+      console.error(error);
+      setFormStatus('Failed to export seating grid PDF');
       trigger();
     }
   };
-
+  
+  
   // ---- NEW: toggle room selection for multi-room generation
   const toggleRoomSelection = (roomId) => {
     setPrimaryForm((prev) => {
@@ -271,9 +380,12 @@ const AdminDashboard = () => {
       // Update plan viewer and dashboard
       setPlanDetail({
         plan: createdPlan,
-        rooms: data.rooms,
-        seatsAllocated: data.seatsAllocated,
+        rooms: data.rooms || [],
+        allocations: data.allocations || [],
+        seatsAllocated: data.seatsAllocated || 0,
       });
+      
+      
       setActivePlanId(createdPlan.id);
 
       // Optional: reload core data if needed
@@ -503,7 +615,8 @@ const AdminDashboard = () => {
                 {activeRoom ? (
                   <SeatGrid
                     room={activeRoom}
-                    allocations={planDetail.allocations}
+                    // allocations={planDetail.allocations}
+                    allocations={activeAllocations}
                     onSeatPick={handleSeatPick}
                     selectedSeat={swapSeat}
                   />

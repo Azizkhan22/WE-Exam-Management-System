@@ -6,7 +6,9 @@ const csv = require("csv-parser");
 const db = require("../db");
 
 router.post("/csv", upload.single("csv"), async (req, res) => {
+    console.log("CSV UPLOAD CALLED");
     if (!req.file) {
+        console.log("CSV FILE NOT FOUND");
         return res.status(400).json({ message: "CSV file is required" });
     }
 
@@ -14,6 +16,10 @@ router.post("/csv", upload.single("csv"), async (req, res) => {
     const rows = [];
 
     fs.createReadStream(filePath)
+        .on("error", (err) => {
+            console.log("CSV FILE ERROR", err);
+            return res.status(500).json({ message: "Error reading CSV file" });
+        })
         .pipe(csv())
         .on("data", (row) => rows.push(row))
         .on("end", async () => {
@@ -139,6 +145,7 @@ router.post("/csv", upload.single("csv"), async (req, res) => {
                 res.status(500).json({ message: err.message });
             }
         });
+    console.log("CSV UPLOAD COMPLETED");
 }
 
 );

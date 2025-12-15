@@ -34,6 +34,70 @@ const computeSeatGrid = (room) => {
 };
 
 // Allocate students to rooms following adjacency rule
+// const allocateSeatsForRooms = (students, rooms, alreadyAllocatedSeats = new Set()) => {
+//   const allocated = [];
+//   const remainingStudents = [...students];
+
+//   const seatKey = (roomId, row, col) => `${roomId}:${row}:${col}`;
+
+//   const isConflict = (roomId, row, col, student, placed) => {
+//     const directions = [
+//       [-1, 0], [1, 0], [0, -1], [0, 1],
+//       [-1, -1], [-1, 1], [1, -1], [1, 1]
+//     ];
+//     for (const [dr, dc] of directions) {
+//       const r = row + dr;
+//       const c = col + dc;
+//       const p = placed.find(p => p.roomId === roomId && p.seatRow === r && p.seatCol === c);
+//       if (p && p.department_id === student.department_id) return true;
+//     }
+//     return false;
+//   };
+
+//   for (const room of rooms) {
+//     for (let r = 1; r <= room.rows; r++) {
+//       for (let c = 1; c <= room.cols; c++) {
+//         const key = seatKey(room.id, r, c);
+//         if (alreadyAllocatedSeats.has(key)) continue; // skip DB or previous allocation
+
+//         let assigned = false;
+//         shuffle(remainingStudents).some((student, idx) => {
+//           if (!isConflict(room.id, r, c, student, allocated)) {
+//             allocated.push({
+//               roomId: room.id,
+//               seatRow: r,
+//               seatCol: c,
+//               studentId: student.id,
+//               department_id: student.department_id,
+//               semester_id: student.semester_id,
+//             });
+//             remainingStudents.splice(idx, 1);
+//             alreadyAllocatedSeats.add(key);
+//             assigned = true;
+//             return true;
+//           }
+//           return false;
+//         });
+
+//         if (!assigned) {
+//           allocated.push({
+//             roomId: room.id,
+//             seatRow: r,
+//             seatCol: c,
+//             studentId: null,
+//           });
+//           alreadyAllocatedSeats.add(key);
+//         }
+
+//         if (!remainingStudents.length) break;
+//       }
+//       if (!remainingStudents.length) break;
+//     }
+//     if (!remainingStudents.length) break;
+//   }
+
+//   return allocated;
+// };
 const allocateSeatsForRooms = (students, rooms, alreadyAllocatedSeats = new Set()) => {
   const allocated = [];
   const remainingStudents = [...students];
@@ -45,24 +109,30 @@ const allocateSeatsForRooms = (students, rooms, alreadyAllocatedSeats = new Set(
       [-1, 0], [1, 0], [0, -1], [0, 1],
       [-1, -1], [-1, 1], [1, -1], [1, 1]
     ];
-    for (const [dr, dc] of directions) {
-      const r = row + dr;
-      const c = col + dc;
-      const p = placed.find(p => p.roomId === roomId && p.seatRow === r && p.seatCol === c);
-      if (p && p.department_id === student.department_id) return true;
-    }
-    return false;
+
+    return directions.some(([dr, dc]) => {
+      const p = placed.find(
+        x =>
+          x.roomId === roomId &&
+          x.seatRow === row + dr &&
+          x.seatCol === col + dc
+      );
+      return p && p.department_id === student.department_id;
+    });
   };
 
   for (const room of rooms) {
     for (let r = 1; r <= room.rows; r++) {
       for (let c = 1; c <= room.cols; c++) {
         const key = seatKey(room.id, r, c);
-        if (alreadyAllocatedSeats.has(key)) continue; // skip DB or previous allocation
+        if (alreadyAllocatedSeats.has(key)) continue;
 
-        let assigned = false;
-        shuffle(remainingStudents).some((student, idx) => {
+        let assignedIndex = -1;
+
+        for (let i = 0; i < remainingStudents.length; i++) {
+          const student = remainingStudents[i];
           if (!isConflict(room.id, r, c, student, allocated)) {
+            assignedIndex = i;
             allocated.push({
               roomId: room.id,
               seatRow: r,
@@ -71,29 +141,18 @@ const allocateSeatsForRooms = (students, rooms, alreadyAllocatedSeats = new Set(
               department_id: student.department_id,
               semester_id: student.semester_id,
             });
-            remainingStudents.splice(idx, 1);
             alreadyAllocatedSeats.add(key);
-            assigned = true;
-            return true;
+            break;
           }
-          return false;
-        });
-
-        if (!assigned) {
-          allocated.push({
-            roomId: room.id,
-            seatRow: r,
-            seatCol: c,
-            studentId: null,
-          });
-          alreadyAllocatedSeats.add(key);
         }
 
-        if (!remainingStudents.length) break;
+        if (assignedIndex !== -1) {
+          remainingStudents.splice(assignedIndex, 1);
+        }
+
+        if (!remainingStudents.length) return allocated;
       }
-      if (!remainingStudents.length) break;
     }
-    if (!remainingStudents.length) break;
   }
 
   return allocated;

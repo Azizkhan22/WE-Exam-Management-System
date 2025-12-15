@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { FiSearch, FiMapPin, FiClock, FiCheckCircle } from 'react-icons/fi';
 import apiClient from '../services/api';
 import PlanSeatGridReadOnly from '../components/SeatingGrid';
+import { useNavigate } from 'react-router-dom'; 
 
 const StudentSeatPage = () => {
+  const navigate = useNavigate(); 
   const [roll, setRoll] = useState('');
   const [seat, setSeat] = useState(null);
   const [error, setError] = useState('');
@@ -31,6 +33,12 @@ const StudentSeatPage = () => {
   return (
     <div className="min-h-screen px-6 md:px-12 py-12 text-white">
       <div className="max-w-4xl mx-auto space-y-10">
+      <button
+          onClick={() => navigate('/')} // <-- navigate to home
+          className="px-6 py-3 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition"
+        >
+          Back to Home
+        </button>
         <div className="glass p-8 border border-white/10 space-y-4 text-center">
           <p className="text-xs uppercase tracking-[0.4em] text-gray-400">Student portal</p>
           <h1 className="text-4xl font-display">Find your seat in seconds</h1>
