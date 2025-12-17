@@ -2,30 +2,36 @@ const bcrypt = require('bcryptjs');
 
 let db; // will hold the Database instance
 
-// Initialize Turso database dynamically (ESM import)
 async function initDb() {
   if (!db) {
-    const { Database } = await import('@tursodatabase/database');
+    // dynamic import works in CJS
+    const DatabaseModule = await import('@tursodatabase/database');
+    const { Database } = DatabaseModule;
     db = new Database(process.env.DATABASE_URL);
   }
   return db;
 }
 
-// Promisify Turso methods similar to your SQLite code
+// Use initDb() before every db call
 const run = async (sql, params = []) => {
-  return await db.run(sql, params);
+  await initDb();
+  return db.run(sql, params);
 };
 
 const get = async (sql, params = []) => {
-  return await db.get(sql, params);
+  await initDb();
+  return db.get(sql, params);
 };
 
 const all = async (sql, params = []) => {
-  return await db.all(sql, params);
+  await initDb();
+  return db.all(sql, params);
 };
+
 
 // Initialize all tables and seed default admin
 const initializeDatabase = async () => {
+  await initDb();
   const schemaStatements = [
     'PRAGMA foreign_keys = ON',
 
@@ -149,4 +155,5 @@ const initializeDatabase = async () => {
   }
 };
 
-module.exports = { db, run, get, all, initializeDatabase };
+module.exports = { run, get, all, initializeDatabase };
+
