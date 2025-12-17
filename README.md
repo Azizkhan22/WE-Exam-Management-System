@@ -13,6 +13,9 @@ It lets admins import student and catalog data, configure rooms, generate optimi
 
 🔗 https://kaems.vercel.app
 
+Admin Credentials:
+- **Email**: admin@kaems.com
+- **Password**: Admin@123
 ## Features
 
 - **Admin features**
