@@ -9,6 +9,9 @@ An end-to-end **exam seating management** platform built with:
 It lets admins import student and catalog data, configure rooms, generate optimized multi-room seating plans, export invigilation packs to PDF, and lets students look up their seat with just a roll number and exam date.
 
 ---
+## Live Demo
+
+🔗 https://kaems.vercel.app
 
 ## Features
 
