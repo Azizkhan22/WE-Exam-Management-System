@@ -1,8 +1,15 @@
-const { Database } = require("@tursodatabase/database");
-const bcrypt = require("bcryptjs");
+const bcrypt = require('bcryptjs');
 
-// Connect to Turso via DATABASE_URL
-const db = new Database(process.env.DATABASE_URL);
+let db; // will hold the Database instance
+
+// Initialize Turso database dynamically (ESM import)
+async function initDb() {
+  if (!db) {
+    const { Database } = await import('@tursodatabase/database');
+    db = new Database(process.env.DATABASE_URL);
+  }
+  return db;
+}
 
 // Promisify Turso methods similar to your SQLite code
 const run = async (sql, params = []) => {
