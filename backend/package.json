@@ -13,6 +13,8 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@tursodatabase/api": "^1.9.2",
+    "@tursodatabase/database": "^0.3.2",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "csv-parser": "^3.2.0",
