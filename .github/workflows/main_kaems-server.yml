@@ -59,4 +59,5 @@ jobs:
         with:
           app-name: 'kaems-server'
           slot-name: 'Production'
-          package: ./node-app
+          package: .
+
